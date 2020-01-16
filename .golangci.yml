@@ -1,6 +1,8 @@
 run:
   deadline: 30s
 
+  skip-dirs-use-default: true
+
 linters:
   disable-all: true
   enable:

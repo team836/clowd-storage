@@ -1,2 +1,5 @@
 # settings for IDE or editor
 .idea
+
+# dependencies
+vendor
