@@ -18,4 +18,4 @@
 *.out
 
 # environment files
-.env
+env.yml
