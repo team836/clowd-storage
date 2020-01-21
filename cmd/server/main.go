@@ -1,9 +1,10 @@
 package main
 
 import (
-	"log"
 	"os"
 	"path"
+
+	"github.com/team836/clowd-storage/pkg/logger"
 
 	"github.com/spf13/viper"
 )
@@ -11,7 +12,7 @@ import (
 func main() {
 	currDir, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		logger.Console().Fatal(err)
 	}
 
 	// set app root path as config
@@ -20,6 +21,6 @@ func main() {
 	// load env file
 	viper.SetConfigFile(path.Join(viper.GetString("AppRoot"), "./env.yml"))
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading env file, %s", err)
+		logger.Console().Fatalf("Error reading env file, %s", err)
 	}
 }
