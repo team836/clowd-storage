@@ -12,24 +12,26 @@ import (
 
 // singleton instances
 var (
-	cmdLogger  *logrus.Logger
-	fileLogger *logrus.Logger
+	consoleLogger *logrus.Logger
+	fileLogger    *logrus.Logger
 )
 
 // for thread safe singleton
 var (
-	cmdOnce  sync.Once
-	fileOnce sync.Once
+	consoleOnce sync.Once
+	fileOnce    sync.Once
 )
 
-func Cmd() *logrus.Logger {
-	cmdOnce.Do(func() {
-		cmdLogger = newCmdLogger()
+// console logger
+func Console() *logrus.Logger {
+	consoleOnce.Do(func() {
+		consoleLogger = newConsoleLogger()
 	})
 
-	return cmdLogger
+	return consoleLogger
 }
 
+// file logger
 func File() *logrus.Logger {
 	fileOnce.Do(func() {
 		fileLogger = newFileLogger()
@@ -38,7 +40,7 @@ func File() *logrus.Logger {
 	return fileLogger
 }
 
-func newCmdLogger() *logrus.Logger {
+func newConsoleLogger() *logrus.Logger {
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
@@ -61,7 +63,7 @@ func newFileLogger() *logrus.Logger {
 		0666,
 	)
 	if err != nil {
-		Cmd().Warn("Failed to logger to file, using default stderr")
+		Console().Warn("Failed to logger to file, using default stderr")
 	} else {
 		logger.SetOutput(file)
 	}
