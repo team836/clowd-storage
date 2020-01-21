@@ -19,3 +19,6 @@
 
 # environment files
 env.yml
+
+# log files
+logs
