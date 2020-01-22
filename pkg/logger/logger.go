@@ -52,20 +52,26 @@ func newConsoleLogger() *logrus.Logger {
 
 func newFileLogger() *logrus.Logger {
 	logger := logrus.New()
+
+	// set log format
 	logger.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05",
 	})
 
-	file, err := os.OpenFile(
-		path.Join(viper.GetString("AppRoot"), "/logs/logfile.log"),
+	// open the common log file
+	commonLogFile, err := os.OpenFile(
+		path.Join(viper.GetString("AppRoot"), "/logs/common.log"),
 		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
 		0666,
 	)
+
+	// set output for logger
 	if err != nil {
-		Console().Warn("Failed to logger to file, using default stderr")
+		Console().Warn("Failed to logging to file(`common.log`), using default stderr")
+		logger.SetOutput(os.Stderr)
 	} else {
-		logger.SetOutput(file)
+		logger.SetOutput(commonLogFile)
 	}
 
 	return logger
