@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
+	"net/http"
 	"os"
+	"os/signal"
 	"path"
+	"time"
+
+	"github.com/team836/clowd-storage/internal/api"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -25,7 +31,33 @@ func main() {
 		logger.Console().Fatalf("Error reading env file, %s", err)
 	}
 
+	// build all of the router
 	router := buildRouter()
+
+	// start server
+	go func() {
+		err := router.StartServer(&http.Server{
+			Addr:           ":" + viper.GetString("APP.PORT"),
+			ReadTimeout:    5 * time.Second,
+			WriteTimeout:   7 * time.Second,
+			MaxHeaderBytes: 1 << 20,
+		})
+
+		if err != nil {
+			logger.Console().Errorf("Error starting the server, %s", err)
+		}
+	}()
+
+	// wait for interrupt signal to gracefully shutdown the server with
+	// a timeout of 10 seconds
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := router.Shutdown(ctx); err != nil {
+		logger.File().Error(err)
+	}
 }
 
 func buildRouter() *echo.Echo {
