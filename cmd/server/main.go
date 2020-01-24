@@ -42,7 +42,7 @@ func buildRouter() *echo.Echo {
 		accessLogFile = os.Stdout
 	}
 
-	// basic middleware list which is applied to main router
+	// basic middleware list
 	basicMiddleware := []echo.MiddlewareFunc{
 		middleware.BodyLimit("200MB"),
 		middleware.CORS(),
@@ -59,6 +59,8 @@ func buildRouter() *echo.Echo {
 
 	mainRouter := echo.New()
 	mainRouter.Use(basicMiddleware...)
+	v1Group := mainRouter.Group("/v1")
+	api.RegisterHandlers(v1Group)
 
 	return mainRouter
 }
