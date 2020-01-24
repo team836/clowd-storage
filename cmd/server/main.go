@@ -29,6 +29,10 @@ func main() {
 		logger.Console().Fatalf("Error reading env file, %s", err)
 	}
 
+	// open database connection
+	conn := provider.DBService()
+	defer conn.Close()
+
 	// build all of the router
 	router := provider.RouteService()
 
