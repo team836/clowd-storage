@@ -39,5 +39,37 @@ func newSocketPool() *SocketPool {
 		unregister: make(chan *Clowder),
 	}
 
+	go pool.run()
+
 	return pool
+}
+
+/**
+Run the pool operations concurrently using non-blocking channels.
+
+register: register the clowder to pool
+unregister: unregister the clowder from pool
+ping: broadcast to all registered clowders for sending check ping
+*/
+func (pool *SocketPool) run() {
+	for {
+		select {
+		case clowder := <-pool.register:
+			pool.clowders[clowder] = true
+		case clowder := <-pool.unregister:
+			if _, ok := pool.clowders[clowder]; ok {
+				delete(pool.clowders, clowder)
+				close(clowder.pingFlag)
+			}
+		case <-pool.pingFlag:
+			for clowder := range pool.clowders {
+				select {
+				case clowder.pingFlag <- true:
+				default:
+					close(clowder.pingFlag)
+					delete(pool.clowders, clowder)
+				}
+			}
+		}
+	}
 }
