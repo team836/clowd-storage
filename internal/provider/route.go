@@ -11,6 +11,9 @@ import (
 	"github.com/team836/clowd-storage/pkg/logger"
 )
 
+/**
+Boot route service.
+*/
 func RouteService() *echo.Echo {
 	// open the access log file
 	accessLogFile, err := os.OpenFile(

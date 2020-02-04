@@ -9,9 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/team836/clowd-storage/internal/provider"
-
 	"github.com/spf13/viper"
+	"github.com/team836/clowd-storage/internal/provider"
 	"github.com/team836/clowd-storage/pkg/logger"
 )
 
