@@ -20,8 +20,8 @@ type Clowder struct {
 	// websocket connection
 	conn *websocket.Conn
 
-	// flag to send check ping to this clowder
-	pingFlag chan bool
+	// ping requests
+	ping chan bool
 }
 
 /**
@@ -42,7 +42,7 @@ func (clowder *Clowder) onPingPong() {
 	clowder.conn.SetReadLimit(maxPongSize)
 
 	for {
-		_, ok := <-clowder.pingFlag // wait for the ping flag
+		_, ok := <-clowder.ping // wait for the ping requested
 
 		// The pool closed the channel
 		if !ok {

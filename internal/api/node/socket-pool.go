@@ -59,14 +59,14 @@ func (pool *SocketPool) run() {
 		case clowder := <-pool.unregister:
 			if _, ok := pool.clowders[clowder]; ok {
 				delete(pool.clowders, clowder)
-				close(clowder.pingFlag)
+				close(clowder.ping)
 			}
 		case <-pool.pingFlag:
 			for clowder := range pool.clowders {
 				select {
-				case clowder.pingFlag <- true:
+				case clowder.ping <- true:
 				default:
-					close(clowder.pingFlag)
+					close(clowder.ping)
 					delete(pool.clowders, clowder)
 				}
 			}

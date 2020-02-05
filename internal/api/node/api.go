@@ -36,8 +36,8 @@ func openWebsocket(ctx echo.Context) error {
 		return nil
 	}
 
-	clowder := &Clowder{conn: conn, pingFlag: make(chan bool)} // create new clowder
-	Pool().register <- clowder                                 // register this clowder to pool
+	clowder := &Clowder{conn: conn, ping: make(chan bool)} // create new clowder
+	Pool().register <- clowder                             // register this clowder to pool
 
 	go clowder.onPingPong() // serve check ping&pong concurrently
 
