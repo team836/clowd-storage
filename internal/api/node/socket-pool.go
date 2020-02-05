@@ -37,6 +37,7 @@ func newSocketPool() *SocketPool {
 		clowders:   make(map[*Clowder]bool),
 		register:   make(chan *Clowder),
 		unregister: make(chan *Clowder),
+		pingFlag:   make(chan bool),
 	}
 
 	go pool.run()
