@@ -36,13 +36,11 @@ func (clowder *Clowder) onPingPong() {
 		_ = clowder.conn.Close()
 	}()
 
-	// connection setting
-	_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
-	_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
 	clowder.conn.SetReadLimit(maxPongSize)
 
 	for {
 		_, ok := <-clowder.ping // wait for the ping requested
+		_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
 
 		// The pool closed the channel
 		if !ok {
@@ -58,6 +56,7 @@ func (clowder *Clowder) onPingPong() {
 		}
 
 		// receive the check pong
+		_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
 		_, msg, err := clowder.conn.ReadMessage()
 		if err != nil {
 			logger.File().Info("Error receiving pong from clowder, %s", err)
