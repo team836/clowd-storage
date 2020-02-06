@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/team836/clowd-storage/pkg/logger"
@@ -63,21 +64,20 @@ func (clowder *Clowder) onPingPong() {
 		}
 
 		// send the check ping
-		err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{})
-		if err != nil {
+		if err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 			logger.File().Info("Error sending ping to clowder, %s", err)
 			return
 		}
 
 		// receive the check pong
 		_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
-		_, msg, err := clowder.conn.ReadMessage()
-		if err != nil {
-			logger.File().Info("Error receiving pong from clowder, %s", err)
+		if err := clowder.conn.ReadJSON(clowder.status); err != nil {
+			logger.File().Info("Error receiving pong data from clowder, %s", err)
 			return
 		}
 
-		// TODO: Need to handle the received pong message
-		logger.Console().Printf("pong message: %s", msg)
+		// TODO: Need to handle the received pong data
+		jsonString, _ := json.Marshal(clowder.status)
+		logger.Console().Printf("pong data: %s", jsonString)
 	}
 }
