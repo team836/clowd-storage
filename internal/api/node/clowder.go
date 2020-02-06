@@ -16,12 +16,26 @@ const (
 	maxPongSize = 512
 )
 
+type Status struct {
+	// round trip time (ms)
+	RTT uint `json:"rtt"`
+
+	// network bandwidth (Mbps)
+	Bandwidth uint `json:"bandwidth"`
+
+	// available capacity of the clowder (KB)
+	Capacity uint64 `json:"capacity"`
+}
+
 type Clowder struct {
 	// websocket connection
 	conn *websocket.Conn
 
 	// ping requests
 	ping chan bool
+
+	// clowder status
+	status *Status
 }
 
 /**
