@@ -12,10 +12,13 @@ import (
 )
 
 var (
-	conn *gorm.DB  // singleton instances
+	conn *gorm.DB  // singleton instance
 	once sync.Once // for thread safe singleton
 )
 
+/**
+Return the singleton database connection instance.
+*/
 func Conn() *gorm.DB {
 	once.Do(func() {
 		conn = newConnection()

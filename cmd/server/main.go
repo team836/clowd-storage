@@ -6,15 +6,17 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"time"
 
-	"github.com/team836/clowd-storage/internal/provider"
-
 	"github.com/spf13/viper"
+	"github.com/team836/clowd-storage/internal/provider"
 	"github.com/team836/clowd-storage/pkg/logger"
 )
 
 func main() {
+	setMaxProcs()
+
 	currDir, err := os.Getwd()
 	if err != nil {
 		logger.Console().Fatal(err)
@@ -60,4 +62,17 @@ func main() {
 	if err := router.Shutdown(ctx); err != nil {
 		logger.File().Error(err)
 	}
+}
+
+func setMaxProcs() {
+	var maxProcs int
+	cpuNum := runtime.NumCPU()
+
+	if cpuNum == 1 { // if single cpu,
+		maxProcs = 2 // use 2 logical cpu for concurrency
+	} else {
+		maxProcs = cpuNum
+	}
+
+	runtime.GOMAXPROCS(maxProcs)
 }
