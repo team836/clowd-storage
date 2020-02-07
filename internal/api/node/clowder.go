@@ -18,6 +18,7 @@ const (
 )
 
 type Status struct {
+	// TODO: measure rtt when ping and pong
 	// round trip time (ms)
 	RTT uint `json:"rtt"`
 
