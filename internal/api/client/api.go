@@ -8,10 +8,20 @@ import (
 )
 
 func RegisterHandlers(group *echo.Group) {
-	group.POST("/file", fileUpload)
+	group.POST("/file", upload)
 }
 
-func fileUpload(ctx echo.Context) error {
+/**
+File upload request for checking whether there are available nodes to store.
+*/
+func uploadRequest(ctx echo.Context) error {
+	return nil
+}
+
+/**
+File upload
+*/
+func upload(ctx echo.Context) error {
 	form, err := ctx.MultipartForm()
 	if err != nil {
 		logger.File().Infof("Error uploading client's file, %s", err)
