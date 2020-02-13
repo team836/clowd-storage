@@ -1,6 +1,18 @@
 package node
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
+
+const (
+	pingCoolTime = 20 * time.Second
+)
+
+var (
+	pool *SocketPool // singleton instance
+	once sync.Once   // for thread safe singleton
+)
 
 type SocketPool struct {
 	// registered clowders
@@ -14,12 +26,16 @@ type SocketPool struct {
 
 	// flag to send check ping to all clowders
 	pingFlag chan bool
-}
 
-var (
-	pool *SocketPool // singleton instance
-	once sync.Once   // for thread safe singleton
-)
+	// last ping time
+	lastPingAt time.Time
+
+	// wait group for checking all ping&pong are done
+	pingWaitGroup sync.WaitGroup
+
+	// mutex for all clowders' status
+	ClowdersStatusLock sync.Mutex
+}
 
 /**
 Return the singleton socket pool instance.
@@ -37,6 +53,7 @@ func newSocketPool() *SocketPool {
 		clowders:   make(map[*Clowder]bool),
 		register:   make(chan *Clowder),
 		unregister: make(chan *Clowder),
+		lastPingAt: time.Now().Add(-24 * time.Hour),
 		pingFlag:   make(chan bool),
 	}
 
