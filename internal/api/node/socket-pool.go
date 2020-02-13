@@ -75,19 +75,24 @@ func (pool *SocketPool) run() {
 		case clowder := <-pool.register:
 			pool.clowders[clowder] = true
 		case clowder := <-pool.unregister:
-			if _, ok := pool.clowders[clowder]; ok {
-				delete(pool.clowders, clowder)
-				close(clowder.ping)
-			}
+			delete(pool.clowders, clowder)
 		case <-pool.pingFlag:
-			for clowder := range pool.clowders {
-				select {
-				case clowder.ping <- true:
-				default:
-					close(clowder.ping)
-					delete(pool.clowders, clowder)
+			if time.Now().After(pool.lastPingAt.Add(pingCoolTime)) {
+				pool.lastPingAt = time.Now()
+
+				for clowder := range pool.clowders {
+					pool.pingWaitGroup.Add(1)
+					go clowder.pingPong()
 				}
 			}
+
+			pool.pingWaitGroup.Done()
 		}
 	}
+}
+
+func (pool *SocketPool) CheckAllClowders() {
+	pool.pingWaitGroup.Add(1)
+	pool.pingFlag <- true
+	pool.pingWaitGroup.Wait()
 }
