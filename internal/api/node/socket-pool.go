@@ -53,8 +53,8 @@ func newSocketPool() *SocketPool {
 		clowders:   make(map[*Clowder]bool),
 		register:   make(chan *Clowder),
 		unregister: make(chan *Clowder),
-		lastPingAt: time.Now().Add(-24 * time.Hour),
 		pingFlag:   make(chan bool),
+		lastPingAt: time.Now().Add(-24 * time.Hour),
 	}
 
 	go pool.run()
@@ -67,7 +67,7 @@ Run the pool operations concurrently using non-blocking channels.
 
 register: register the clowder to pool
 unregister: unregister the clowder from pool
-ping: broadcast to all registered clowders for sending check ping
+pingFlag: send ping concurrently to all registered clowders for check clowders' status
 */
 func (pool *SocketPool) run() {
 	for {
@@ -77,6 +77,7 @@ func (pool *SocketPool) run() {
 		case clowder := <-pool.unregister:
 			delete(pool.clowders, clowder)
 		case <-pool.pingFlag:
+			// check ping cool time
 			if time.Now().After(pool.lastPingAt.Add(pingCoolTime)) {
 				pool.lastPingAt = time.Now()
 
@@ -91,6 +92,10 @@ func (pool *SocketPool) run() {
 	}
 }
 
+/**
+Encapsulated function for sending ping flag and
+wait for all ping&pong to finish.
+*/
 func (pool *SocketPool) CheckAllClowders() {
 	pool.pingWaitGroup.Add(1)
 	pool.pingFlag <- true
