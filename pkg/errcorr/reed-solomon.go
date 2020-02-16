@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/team836/clowd-storage/pkg/logger"
-
 	"github.com/klauspost/reedsolomon"
 )
 
@@ -26,21 +24,18 @@ func Encode(file io.Reader) ([][]byte, error) {
 	// create reed solomon encoder
 	enc, err := reedsolomon.New(dataShards, parityShards)
 	if err != nil {
-		logger.File().Infof("Error creating new encoder for reed solomon, %s", err)
 		return nil, err
 	}
 
 	// split the file data
 	splitData, err := enc.Split(buf.Bytes())
 	if err != nil {
-		logger.File().Infof("Error splitting the file data, %s", err)
 		return nil, err
 	}
 
 	// encode the split file using reed solomon algorithm
 	err = enc.Encode(splitData)
 	if err != nil {
-		logger.File().Infof("Error encoding the file, %s", err)
 		return nil, err
 	}
 

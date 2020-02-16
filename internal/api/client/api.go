@@ -3,6 +3,8 @@ package client
 import (
 	"net/http"
 
+	"github.com/team836/clowd-storage/pkg/errcorr"
+
 	"github.com/team836/clowd-storage/pkg/logger"
 
 	"github.com/team836/clowd-storage/internal/api/node"
@@ -30,10 +32,20 @@ func upload(ctx echo.Context) error {
 		logger.File().Infof("Error uploading client's file, %s", err)
 		return nil
 	}
-	files := form.File["files"]
+	fileHeaders := form.File["files"]
 
-	for _, file := range files {
-		// TODO: RS algorithm
+	for _, fileHeader := range fileHeaders {
+		file, err := fileHeader.Open()
+		if err != nil {
+			logger.File().Infof("Error opening uploaded file, %s", err)
+			return nil
+		}
+
+		shards, err := errcorr.Encode(file)
+		if err != nil {
+			logger.File().Infof("Error encoding the file, %s", err)
+			return nil
+		}
 	}
 
 	node.Pool().ClowdersStatusLock.Lock()
