@@ -63,11 +63,10 @@ func newSocketPool() *SocketPool {
 }
 
 /**
-Run the pool operations concurrently using non-blocking channels.
+Run the pool operations using non-blocking channels.
 
 register: register the clowder to pool
 unregister: unregister the clowder from pool
-pingFlag: send ping concurrently to all registered clowders for check clowders' status
 */
 func (pool *SocketPool) run() {
 	for {
@@ -76,28 +75,28 @@ func (pool *SocketPool) run() {
 			pool.clowders[clowder] = true
 		case clowder := <-pool.unregister:
 			delete(pool.clowders, clowder)
-		case <-pool.pingFlag:
-			// check ping cool time
-			if time.Now().After(pool.lastPingAt.Add(pingCoolTime)) {
-				pool.lastPingAt = time.Now()
-
-				for clowder := range pool.clowders {
-					pool.pingWaitGroup.Add(1)
-					go clowder.pingPong()
-				}
-			}
-
-			pool.pingWaitGroup.Done()
 		}
 	}
 }
 
 /**
-Encapsulated function for sending ping flag and
-wait for all ping&pong to finish.
+Send ping concurrently to all registered clowders for check clowders' status
+and wait for all ping&pong to finish.
+
+This function change clowders' status. So you SHOULD use this function with
+the `ClowdersStatusLock` which is mutex for all clowders' status.
 */
 func (pool *SocketPool) CheckAllClowders() {
-	pool.pingWaitGroup.Add(1)
-	pool.pingFlag <- true
+	// check ping cool time
+	if time.Now().After(pool.lastPingAt.Add(pingCoolTime)) {
+		pool.lastPingAt = time.Now()
+
+		for clowder := range pool.clowders {
+			pool.pingWaitGroup.Add(1)
+			go clowder.pingPong()
+		}
+	}
+
+	// wait for all ping&pong to finish
 	pool.pingWaitGroup.Wait()
 }
