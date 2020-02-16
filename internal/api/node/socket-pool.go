@@ -1,12 +1,13 @@
 package node
 
 import (
+	"container/ring"
 	"sync"
 	"time"
 )
 
 const (
-	pingCoolTime = 20 * time.Second
+	pingCoolTime = 15 * time.Second
 )
 
 var (
@@ -99,4 +100,23 @@ func (pool *SocketPool) CheckAllClowders() {
 
 	// wait for all ping&pong to finish
 	pool.pingWaitGroup.Wait()
+}
+
+/**
+Select the clowders to save the files and sort them by node selection algorithm.
+Return type is ring, which is circular list, because select the clowders until
+all shards sending are scheduled.
+
+This function read clowders' status at specific time. So you SHOULD use this function with
+the `ClowdersStatusLock` which is mutex for all clowders' status.
+*/
+func (pool *SocketPool) SelectClowders() *ring.Ring {
+	r := ring.New(len(pool.clowders))
+
+	for clowder := range pool.clowders {
+		r.Value = clowder
+		r = r.Next()
+	}
+
+	return r
 }
