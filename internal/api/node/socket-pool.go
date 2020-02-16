@@ -28,9 +28,6 @@ type SocketPool struct {
 	// unregister requests from the clowder
 	unregister chan *Clowder
 
-	// flag to send check ping to all clowders
-	pingFlag chan bool
-
 	// last ping time
 	lastPingAt time.Time
 
@@ -54,7 +51,6 @@ func newSocketPool() *SocketPool {
 		clowders:   make(map[*Clowder]bool),
 		register:   make(chan *Clowder),
 		unregister: make(chan *Clowder),
-		pingFlag:   make(chan bool),
 		lastPingAt: time.Now().Add(-24 * time.Hour),
 	}
 
