@@ -49,7 +49,7 @@ func (clowder *Clowder) pingPong() {
 	// send the check ping
 	_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
 	if err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-		logger.File().Info("Error sending ping to clowder, %s", err)
+		logger.File().Infof("Error sending ping to clowder, %s", err)
 		clowder.disconnect()
 		return
 	}
@@ -57,7 +57,7 @@ func (clowder *Clowder) pingPong() {
 	// receive the check pong
 	_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
 	if err := clowder.conn.ReadJSON(clowder.status); err != nil {
-		logger.File().Info("Error receiving pong data from clowder, %s", err)
+		logger.File().Infof("Error receiving pong data from clowder, %s", err)
 		clowder.disconnect()
 		return
 	}

@@ -15,6 +15,9 @@ var (
 )
 
 type SocketPool struct {
+	// mutex for all clowders' status
+	ClowdersStatusLock sync.Mutex
+
 	// registered clowders
 	clowders map[*Clowder]bool
 
@@ -32,9 +35,6 @@ type SocketPool struct {
 
 	// wait group for checking all ping&pong are done
 	pingWaitGroup sync.WaitGroup
-
-	// mutex for all clowders' status
-	ClowdersStatusLock sync.Mutex
 }
 
 /**
