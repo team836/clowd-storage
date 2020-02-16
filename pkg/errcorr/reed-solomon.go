@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	dataShards = 100
+	dataShards = 30
 
-	parityShards = 50
+	parityShards = 20
 )
 
 /**
