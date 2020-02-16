@@ -36,8 +36,8 @@ func openWebsocket(ctx echo.Context) error {
 		return nil
 	}
 
-	clowder := &Clowder{conn: conn, status: &Status{}} // create new clowder
-	Pool().register <- clowder                         // register this clowder to pool
+	clowder := NewClowder(conn) // create new clowder
+	Pool().register <- clowder  // register this clowder to pool
 
 	return nil
 }

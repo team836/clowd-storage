@@ -36,6 +36,11 @@ type Clowder struct {
 	status *Status
 }
 
+func NewClowder(conn *websocket.Conn) *Clowder {
+	c := &Clowder{conn: conn, status: &Status{}}
+	return c
+}
+
 /**
 Send ping to the clowder and receive the clowder's information.
 
