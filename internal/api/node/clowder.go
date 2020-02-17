@@ -44,15 +44,26 @@ type Clowder struct {
 	Ping chan bool
 
 	// save file on the clowder
-	SaveFile chan []FileOnNode
+	SaveFile chan []*FileOnNode
+
+	// websocket connection
+	conn *websocket.Conn
+}
+
+func NewFileOnNode(name string, data []byte) *FileOnNode {
+	fon := &FileOnNode{
+		name: name,
+		data: data,
+	}
+	return fon
 }
 
 func NewClowder(conn *websocket.Conn) *Clowder {
 	c := &Clowder{
+		Status:   &Status{},
+		Ping:     make(chan bool, 1), // buffered channel
+		SaveFile: make(chan []*FileOnNode),
 		conn:     conn,
-		status:   &Status{},
-		Ping:     make(chan bool, 1),
-		SaveFile: make(chan []FileOnNode),
 	}
 
 	return c
@@ -82,7 +93,7 @@ func (clowder *Clowder) run() {
 
 			// receive the check pong
 			_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
-			if err := clowder.conn.ReadJSON(clowder.status); err != nil {
+			if err := clowder.conn.ReadJSON(clowder.Status); err != nil {
 				logger.File().Infof("Error receiving pong data from clowder, %s", err)
 				pool.pingWaitGroup.Done()
 				return
