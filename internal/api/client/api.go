@@ -19,10 +19,11 @@ func RegisterHandlers(group *echo.Group) {
 /**
 File upload requested by client(clowdee).
 
-- Get uploading file.
+- Get uploaded file.
 - Run Reed-Solomon algorithm to each files.
 - Check all nodes(clowders)' status by ping and pong.
 - By all nodes' status, run the node selection.
+- Schedule saving for every shards.
 - Update the selected nodes' status by prediction.
 - Finally save the files to the nodes.
 */

@@ -16,6 +16,9 @@ func newUQ() *UploadQueue {
 	return uq
 }
 
+/**
+Push the encoded file to queue.
+*/
 func (uq *UploadQueue) push(file *EncFile) {
 	uq.files = append(uq.files, file)
 }
@@ -30,6 +33,9 @@ func (uq *UploadQueue) pop() *EncFile {
 	return file
 }
 
+/**
+Sort the files by shard size in descending order.
+*/
 func (uq *UploadQueue) sort() {
 	sort.Slice(uq.files, func(i, j int) bool {
 		return len(uq.files[i].data[0]) > len(uq.files[j].data[0])

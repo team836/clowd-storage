@@ -19,6 +19,9 @@ type SocketPool struct {
 	// mutex for all clowders' status
 	ClowdersStatusLock sync.Mutex
 
+	// wait group for checking all ping&pong are done
+	pingWaitGroup sync.WaitGroup
+
 	// registered clowders
 	clowders map[*Clowder]bool
 
@@ -30,9 +33,6 @@ type SocketPool struct {
 
 	// last ping time
 	lastPingAt time.Time
-
-	// wait group for checking all ping&pong are done
-	pingWaitGroup sync.WaitGroup
 }
 
 /**
@@ -46,6 +46,9 @@ func Pool() *SocketPool {
 	return pool
 }
 
+/**
+Create new socket pool.
+*/
 func newSocketPool() *SocketPool {
 	pool := &SocketPool{
 		clowders:   make(map[*Clowder]bool),
@@ -54,6 +57,7 @@ func newSocketPool() *SocketPool {
 		lastPingAt: time.Now().Add(-24 * time.Hour),
 	}
 
+	// run the pool operations concurrently
 	go pool.run()
 
 	return pool
@@ -77,8 +81,8 @@ func (pool *SocketPool) run() {
 }
 
 /**
-Send ping concurrently to all registered clowders for check clowders' status
-and wait for all ping&pong to finish.
+Send ping concurrently to all registered clowders for checking clowders' status
+and wait for all pong response to finish.
 
 This function change clowders' status. So you SHOULD use this function with
 the `ClowdersStatusLock` which is mutex for all clowders' status.
@@ -86,6 +90,7 @@ the `ClowdersStatusLock` which is mutex for all clowders' status.
 func (pool *SocketPool) CheckAllClowders() {
 	// check ping cool time
 	if time.Now().After(pool.lastPingAt.Add(pingCoolTime)) {
+		// update last ping time
 		pool.lastPingAt = time.Now()
 
 		for clowder := range pool.clowders {
@@ -101,12 +106,13 @@ func (pool *SocketPool) CheckAllClowders() {
 /**
 Select the clowders to save the files and sort them by node selection algorithm.
 Return type is ring, which is circular list, because select the clowders until
-all shards sending are scheduled.
+all shards are scheduled.
 
 This function read clowders' status at specific time. So you SHOULD use this function with
 the `ClowdersStatusLock` which is mutex for all clowders' status.
 */
 func (pool *SocketPool) SelectClowders() *ring.Ring {
+	// TODO: implement node selection algorithm
 	r := ring.New(len(pool.clowders))
 
 	for clowder := range pool.clowders {

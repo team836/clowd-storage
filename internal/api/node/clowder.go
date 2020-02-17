@@ -26,7 +26,7 @@ type Status struct {
 	// network bandwidth (Mbps)
 	Bandwidth uint `json:"bandwidth"`
 
-	// available capacity of the clowder (KB)
+	// available capacity of the clowder (Byte)
 	Capacity uint64 `json:"capacity"`
 }
 
@@ -36,11 +36,8 @@ type FileOnNode struct {
 }
 
 type Clowder struct {
-	// websocket connection
-	conn *websocket.Conn
-
 	// clowder status
-	status *Status
+	Status *Status
 
 	// send check ping to the clowder and receive the clowder's information
 	// It SHOULD be buffered channel for non-blocking at the socket pool
@@ -57,6 +54,7 @@ func NewClowder(conn *websocket.Conn) *Clowder {
 		Ping:     make(chan bool, 1),
 		SaveFile: make(chan []FileOnNode),
 	}
+
 	return c
 }
 
