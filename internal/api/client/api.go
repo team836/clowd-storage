@@ -33,29 +33,55 @@ func upload(ctx echo.Context) error {
 		logger.File().Infof("Error uploading client's file, %s", err)
 		return nil
 	}
-	fileHeaders := form.File["files"]
 
+	uq := newUQ()
+	fileHeaders := form.File["files"]
 	for _, fileHeader := range fileHeaders {
+		// open file
 		file, err := fileHeader.Open()
 		if err != nil {
 			logger.File().Infof("Error opening uploaded file, %s", err)
 			return nil
 		}
 
+		// encode file using reed solomon algorithm
 		shards, err := errcorr.Encode(file)
 		if err != nil {
 			logger.File().Infof("Error encoding the file, %s", err)
 			return nil
 		}
+
+		encFile := &EncFile{fileID: "0", data: shards}
+		uq.push(encFile)
 	}
 
+	// this area almost change all clowders' status
+	// so, protect it using mutex for all clowder's status
 	node.Pool().ClowdersStatusLock.Lock()
 
+	// check all clowders' status by ping&pong
 	node.Pool().CheckAllClowders()
-	// TODO: node selection
-	// TODO: clowder status prediction
 
+	// node selection
+	clowders := node.Pool().SelectClowders()
+	if clowders.Len() == 0 {
+		logger.File().Errorf("Available clowders are not exist.")
+		return nil
+	}
+
+	// schedule saving for every shards to the clowders
+	// and get results
+	quotas := uq.schedule(clowders)
+
+	// end of mutex area
 	node.Pool().ClowdersStatusLock.Unlock()
 
-	return ctx.String(http.StatusOK, "good")
+	// save each quota using goroutine
+	for clowder, file := range quotas {
+		go func(c *node.Clowder, f []*node.FileOnNode) {
+			c.SaveFile <- f
+		}(clowder, file)
+	}
+
+	return ctx.NoContent(http.StatusCreated)
 }
