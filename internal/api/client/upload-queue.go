@@ -23,16 +23,6 @@ func (uq *UploadQueue) push(file *EncFile) {
 	uq.files = append(uq.files, file)
 }
 
-func (uq *UploadQueue) pop() *EncFile {
-	if len(uq.files) == 0 {
-		return nil
-	}
-
-	var file *EncFile
-	file, uq.files = uq.files[0], uq.files[1:]
-	return file
-}
-
 /**
 Sort the files by shard size in descending order.
 */
