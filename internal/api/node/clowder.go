@@ -14,6 +14,8 @@ const (
 	pongWait = 1 * time.Second
 
 	maxPongSize = 512
+
+	saveWait = 15 * time.Second
 )
 
 type Status struct {
@@ -28,6 +30,11 @@ type Status struct {
 	Capacity uint64 `json:"capacity"`
 }
 
+type FileOnNode struct {
+	name string
+	data []byte
+}
+
 type Clowder struct {
 	// websocket connection
 	conn *websocket.Conn
@@ -38,10 +45,18 @@ type Clowder struct {
 	// send check ping to the clowder and receive the clowder's information
 	// It SHOULD be buffered channel for non-blocking at the socket pool
 	Ping chan bool
+
+	// save file on the clowder
+	SaveFile chan []FileOnNode
 }
 
 func NewClowder(conn *websocket.Conn) *Clowder {
-	c := &Clowder{conn: conn, status: &Status{}, Ping: make(chan bool, 1)}
+	c := &Clowder{
+		conn:     conn,
+		status:   &Status{},
+		Ping:     make(chan bool, 1),
+		SaveFile: make(chan []FileOnNode),
+	}
 	return c
 }
 
@@ -78,6 +93,12 @@ func (clowder *Clowder) run() {
 			// TODO: need to update RTT
 
 			pool.pingWaitGroup.Done()
+		case files := <-clowder.SaveFile:
+			_ = clowder.conn.SetWriteDeadline(time.Now().Add(saveWait))
+			if err := clowder.conn.WriteJSON(files); err != nil {
+				logger.File().Errorf("Error saving file to clowder, %s", err)
+				return
+			}
 		}
 	}
 }
