@@ -34,46 +34,50 @@ type Clowder struct {
 
 	// clowder status
 	status *Status
+
+	// send check ping to the clowder and receive the clowder's information
+	// It SHOULD be buffered channel for non-blocking at the socket pool
+	Ping chan bool
 }
 
 func NewClowder(conn *websocket.Conn) *Clowder {
-	c := &Clowder{conn: conn, status: &Status{}}
+	c := &Clowder{conn: conn, status: &Status{}, Ping: make(chan bool, 1)}
 	return c
 }
 
 /**
-Send ping to the clowder and receive the clowder's information.
-
-This function is run by goroutine.
+Run the websocket operations using non-blocking channels.
 */
-func (clowder *Clowder) pingPong() {
-	defer pool.pingWaitGroup.Done()
+func (clowder *Clowder) run() {
+	defer func() {
+		_ = clowder.conn.Close()
+		pool.unregister <- clowder
+	}()
 
-	clowder.conn.SetReadLimit(maxPongSize)
+	for {
+		select {
+		case <-clowder.Ping:
+			clowder.conn.SetReadLimit(maxPongSize)
 
-	// send the check ping
-	_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
-	if err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-		logger.File().Infof("Error sending ping to clowder, %s", err)
-		clowder.disconnect()
-		return
+			// send the check ping
+			_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
+			if err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				logger.File().Infof("Error sending ping to clowder, %s", err)
+				pool.pingWaitGroup.Done()
+				return
+			}
+
+			// receive the check pong
+			_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
+			if err := clowder.conn.ReadJSON(clowder.status); err != nil {
+				logger.File().Infof("Error receiving pong data from clowder, %s", err)
+				pool.pingWaitGroup.Done()
+				return
+			}
+
+			// TODO: need to update RTT
+
+			pool.pingWaitGroup.Done()
+		}
 	}
-
-	// receive the check pong
-	_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
-	if err := clowder.conn.ReadJSON(clowder.status); err != nil {
-		logger.File().Infof("Error receiving pong data from clowder, %s", err)
-		clowder.disconnect()
-		return
-	}
-
-	// TODO: need to update RTT
-}
-
-/**
-Disconnect clowder from socket pool.
-*/
-func (clowder *Clowder) disconnect() {
-	_ = clowder.conn.Close()
-	pool.unregister <- clowder
 }

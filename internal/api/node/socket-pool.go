@@ -90,7 +90,7 @@ func (pool *SocketPool) CheckAllClowders() {
 
 		for clowder := range pool.clowders {
 			pool.pingWaitGroup.Add(1)
-			go clowder.pingPong()
+			clowder.Ping <- true
 		}
 	}
 
