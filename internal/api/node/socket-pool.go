@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	pingCoolTime = 15 * time.Second
+	pingCoolTime = 20 * time.Second
 )
 
 var (
