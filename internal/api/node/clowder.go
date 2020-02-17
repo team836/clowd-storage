@@ -31,8 +31,8 @@ type Status struct {
 }
 
 type FileOnNode struct {
-	name string
-	data []byte
+	Name string `json:"name"`
+	Data []byte `json:"data"`
 }
 
 type Clowder struct {
@@ -52,8 +52,8 @@ type Clowder struct {
 
 func NewFileOnNode(name string, data []byte) *FileOnNode {
 	fon := &FileOnNode{
-		name: name,
-		data: data,
+		Name: name,
+		Data: data,
 	}
 	return fon
 }
@@ -104,6 +104,7 @@ func (clowder *Clowder) run() {
 			pool.pingWaitGroup.Done()
 		case files := <-clowder.SaveFile:
 			_ = clowder.conn.SetWriteDeadline(time.Now().Add(saveWait))
+			// byte array data are send as base64 encoded format
 			if err := clowder.conn.WriteJSON(files); err != nil {
 				logger.File().Errorf("Error saving file to clowder, %s", err)
 				return
