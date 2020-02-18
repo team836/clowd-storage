@@ -12,6 +12,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type FileOnClient struct {
+	Name  string `json:"name"`
+	Order int    `json:"order"`
+	Data  string `json:"data"` // base64 encoded
+}
+
 func RegisterHandlers(group *echo.Group) {
 	group.POST("/file", upload)
 }
@@ -28,30 +34,25 @@ File upload requested by client(clowdee).
 - Finally save the files to the nodes.
 */
 func upload(ctx echo.Context) error {
-	form, err := ctx.MultipartForm()
-	if err != nil {
-		logger.File().Infof("Error uploading client's file, %s", err)
+	// bind uploaded data into array of `FileOnClient` struct
+	files := make([]*FileOnClient, 0)
+	if err := ctx.Bind(files); err != nil {
+		logger.File().Infof("Error binding client's uploaded file, %s", err)
 		return nil
 	}
 
+	// create upload queue
 	uq := newUQ()
-	fileHeaders := form.File["files"]
-	for _, fileHeader := range fileHeaders {
-		// open file
-		file, err := fileHeader.Open()
-		if err != nil {
-			logger.File().Infof("Error opening uploaded file, %s", err)
-			return nil
-		}
 
-		// encode file using reed solomon algorithm
-		shards, err := errcorr.Encode(file)
+	// encode every file data using reed solomon algorithm
+	for _, file := range files {
+		shards, err := errcorr.Encode(file.Data)
 		if err != nil {
 			logger.File().Infof("Error encoding the file, %s", err)
 			return nil
 		}
 
-		encFile := &EncFile{fileID: "0", data: shards}
+		encFile := &EncFile{fileID: file.Name, data: shards}
 		uq.push(encFile)
 	}
 
