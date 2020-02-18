@@ -23,10 +23,7 @@ func Encode(data string) ([][]byte, error) {
 	}
 
 	// create reed solomon encoder
-	enc, err := reedsolomon.New(dataShards, parityShards)
-	if err != nil {
-		return nil, err
-	}
+	enc, _ := reedsolomon.New(dataShards, parityShards)
 
 	// split the file data
 	splitData, err := enc.Split(bytes)
