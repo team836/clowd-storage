@@ -66,7 +66,7 @@ func (uq *UploadQueue) schedule(clowders *ring.Ring) map[*node.Clowder][]*node.F
 			// clowder status prediction
 			currClowder.Status.Capacity -= uint64(len(shard))
 
-			clowders.Next()
+			clowders = clowders.Next()
 		}
 	}
 
