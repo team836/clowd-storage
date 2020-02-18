@@ -1,8 +1,7 @@
 package errcorr
 
 import (
-	"bytes"
-	"io"
+	"encoding/base64"
 
 	"github.com/klauspost/reedsolomon"
 )
@@ -14,12 +13,14 @@ const (
 )
 
 /**
-Encode the file using reed solomon algorithm.
+Encode the file data using reed solomon algorithm.
 */
-func Encode(file io.Reader) ([][]byte, error) {
-	// make byte buffer from file
-	buf := &bytes.Buffer{}
-	_, _ = buf.ReadFrom(file)
+func Encode(data string) ([][]byte, error) {
+	// make byte buffer from base64 string
+	bytes, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return nil, err
+	}
 
 	// create reed solomon encoder
 	enc, err := reedsolomon.New(dataShards, parityShards)
@@ -28,7 +29,7 @@ func Encode(file io.Reader) ([][]byte, error) {
 	}
 
 	// split the file data
-	splitData, err := enc.Split(buf.Bytes())
+	splitData, err := enc.Split(bytes)
 	if err != nil {
 		return nil, err
 	}
