@@ -35,7 +35,7 @@ File upload requested by client(clowdee).
 */
 func upload(ctx echo.Context) error {
 	// bind uploaded data into array of `FileOnClient` struct
-	files := make([]*FileOnClient, 0)
+	files := &[]*FileOnClient{}
 	if err := ctx.Bind(files); err != nil {
 		logger.File().Infof("Error binding client's uploaded file, %s", err)
 		return err
@@ -45,7 +45,7 @@ func upload(ctx echo.Context) error {
 	uq := newUQ()
 
 	// encode every file data using reed solomon algorithm
-	for _, file := range files {
+	for _, file := range *files {
 		shards, err := errcorr.Encode(file.Data)
 		if err != nil {
 			logger.File().Infof("Error encoding the file, %s", err)
