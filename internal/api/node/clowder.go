@@ -62,6 +62,7 @@ func NewClowder(conn *websocket.Conn) *Clowder {
 	c := &Clowder{
 		Status:   &Status{},
 		Ping:     make(chan bool, 1), // buffered channel
+		Ping:     make(chan bool),
 		SaveFile: make(chan []*FileOnNode),
 		conn:     conn,
 	}
