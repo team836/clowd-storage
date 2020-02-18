@@ -40,5 +40,5 @@ func openWebsocket(ctx echo.Context) error {
 	go clowder.run()            // run the websocket operations
 	Pool().register <- clowder  // register this clowder to pool
 
-	return ctx.NoContent(http.StatusOK)
+	return nil
 }
