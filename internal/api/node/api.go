@@ -33,12 +33,12 @@ func openWebsocket(ctx echo.Context) error {
 	conn, err := upgrader.Upgrade(ctx.Response(), ctx.Request(), nil)
 	if err != nil {
 		logger.File().Infof("Error upgrading to websocket, %s", err)
-		return nil
+		return err
 	}
 
 	clowder := NewClowder(conn) // create new clowder
 	go clowder.run()            // run the websocket operations
 	Pool().register <- clowder  // register this clowder to pool
 
-	return nil
+	return ctx.NoContent(http.StatusOK)
 }

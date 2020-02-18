@@ -38,7 +38,7 @@ func upload(ctx echo.Context) error {
 	files := make([]*FileOnClient, 0)
 	if err := ctx.Bind(files); err != nil {
 		logger.File().Infof("Error binding client's uploaded file, %s", err)
-		return nil
+		return err
 	}
 
 	// create upload queue
@@ -49,7 +49,7 @@ func upload(ctx echo.Context) error {
 		shards, err := errcorr.Encode(file.Data)
 		if err != nil {
 			logger.File().Infof("Error encoding the file, %s", err)
-			return nil
+			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
 		encFile := &EncFile{fileID: file.Name, data: shards}
@@ -67,7 +67,7 @@ func upload(ctx echo.Context) error {
 	clowders := node.Pool().SelectClowders()
 	if clowders.Len() == 0 {
 		logger.File().Errorf("Available clowders are not exist.")
-		return nil
+		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available clowders")
 	}
 
 	// schedule saving for every shards to the clowders
