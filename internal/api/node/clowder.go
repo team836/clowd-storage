@@ -15,7 +15,7 @@ const (
 
 	maxPongSize = 512
 
-	saveWait = 15 * time.Second
+	saveWait = 30 * time.Second
 )
 
 type Status struct {
