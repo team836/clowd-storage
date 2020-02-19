@@ -72,7 +72,11 @@ func upload(ctx echo.Context) error {
 
 	// schedule saving for every shards to the clowders
 	// and get results
-	quotas := uq.schedule(clowders)
+	quotas, err := uq.schedule(clowders)
+	if err != nil {
+		logger.File().Error(err)
+		return ctx.String(http.StatusNotAcceptable, err.Error())
+	}
 
 	// save each quota using goroutine
 	for clowder, file := range quotas {

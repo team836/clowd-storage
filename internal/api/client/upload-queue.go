@@ -2,6 +2,7 @@ package client
 
 import (
 	"container/ring"
+	"errors"
 	"sort"
 
 	"github.com/team836/clowd-storage/internal/api/node"
@@ -44,7 +45,7 @@ And update metadata and predict clowders' status by scheduling results.
 This function change clowders' status. So you SHOULD use this function with
 the `ClowdersStatusLock` which is mutex for all clowders' status.
 */
-func (uq *UploadQueue) schedule(clowders *ring.Ring) map[*node.Clowder][]*node.FileOnNode {
+func (uq *UploadQueue) schedule(clowders *ring.Ring) (map[*node.Clowder][]*node.FileOnNode, error) {
 	// sort the files to upload before scheduling
 	uq.sort()
 
@@ -53,6 +54,19 @@ func (uq *UploadQueue) schedule(clowders *ring.Ring) map[*node.Clowder][]*node.F
 	for _, file := range uq.files {
 		// for every shards
 		for _, shard := range file.data {
+			tolerance := 0
+			// find the clowder which can store this shard
+			for clowders.Value.(*node.Clowder).Status.Capacity < uint64(len(shard)) {
+				tolerance++
+				if tolerance >= clowders.Len() {
+					// reach at this point when
+					// no longer there are not exist possible clowders
+					return nil, errors.New("cannot save the files because of lack of storage space")
+				}
+
+				clowders = clowders.Next()
+			}
+
 			currClowder := clowders.Value.(*node.Clowder)
 
 			// assignment shard to this clowder
@@ -70,5 +84,5 @@ func (uq *UploadQueue) schedule(clowders *ring.Ring) map[*node.Clowder][]*node.F
 		}
 	}
 
-	return quotas
+	return quotas, nil
 }
