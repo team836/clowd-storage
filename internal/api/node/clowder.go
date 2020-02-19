@@ -1,7 +1,6 @@
 package node
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/team836/clowd-storage/pkg/logger"
@@ -15,69 +14,112 @@ const (
 	pongWait = 1 * time.Second
 
 	maxPongSize = 512
+
+	saveWait = 30 * time.Second
 )
 
 type Status struct {
+	// TODO: measure rtt when ping and pong
 	// round trip time (ms)
 	RTT uint `json:"rtt"`
 
 	// network bandwidth (Mbps)
 	Bandwidth uint `json:"bandwidth"`
 
-	// available capacity of the clowder (KB)
+	// available capacity of the clowder (Byte)
 	Capacity uint64 `json:"capacity"`
+
+	// last checked time for this status
+	lastCheckedAt time.Time
+
+	// whether this status is old or not
+	isOld bool
+}
+
+type FileOnNode struct {
+	Name string `json:"name"`
+	Data []byte `json:"data"`
 }
 
 type Clowder struct {
+	// clowder status
+	Status *Status
+
+	// send check ping to the clowder and receive the clowder's information
+	// It SHOULD be buffered channel for non-blocking at the socket pool
+	Ping chan bool
+
+	// save file on the clowder
+	SaveFile chan []*FileOnNode
+
 	// websocket connection
 	conn *websocket.Conn
+}
 
-	// ping requests
-	ping chan bool
+func NewFileOnNode(name string, data []byte) *FileOnNode {
+	fon := &FileOnNode{
+		Name: name,
+		Data: data,
+	}
+	return fon
+}
 
-	// clowder status
-	status *Status
+func NewClowder(conn *websocket.Conn) *Clowder {
+	c := &Clowder{
+		Status: &Status{
+			lastCheckedAt: time.Now().Add(-24 * time.Hour),
+			isOld:         true,
+		},
+		Ping:     make(chan bool, 1), // buffered channel for trying ping
+		SaveFile: make(chan []*FileOnNode),
+		conn:     conn,
+	}
+
+	return c
 }
 
 /**
-Wait for the check ping flag and then send ping to the clowder
-and receive the clowder's information.
-
-A goroutine running this function is started for each connection.
+Run the websocket operations using non-blocking channels.
 */
-func (clowder *Clowder) onPingPong() {
+func (clowder *Clowder) run() {
 	defer func() {
-		pool.unregister <- clowder
 		_ = clowder.conn.Close()
+		pool.unregister <- clowder
 	}()
 
-	clowder.conn.SetReadLimit(maxPongSize)
-
 	for {
-		_, ok := <-clowder.ping // wait for the ping requested
-		_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
+		select {
+		case <-clowder.Ping:
+			clowder.conn.SetReadLimit(maxPongSize)
 
-		// The pool closed the channel
-		if !ok {
-			_ = clowder.conn.WriteMessage(websocket.CloseMessage, []byte{})
-			return
+			// send the check ping
+			_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
+			if err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				logger.File().Infof("Error sending ping to clowder, %s", err)
+				pool.pingWaitGroup.Done()
+				return
+			}
+
+			// receive the check pong
+			_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
+			if err := clowder.conn.ReadJSON(clowder.Status); err != nil {
+				logger.File().Infof("Error receiving pong data from clowder, %s", err)
+				pool.pingWaitGroup.Done()
+				return
+			}
+
+			// TODO: need to update RTT
+
+			clowder.Status.lastCheckedAt = time.Now() // update last ping time
+			clowder.Status.isOld = false
+			pool.pingWaitGroup.Done()
+		case files := <-clowder.SaveFile:
+			_ = clowder.conn.SetWriteDeadline(time.Now().Add(saveWait))
+			// byte array data are send as base64 encoded format
+			if err := clowder.conn.WriteJSON(files); err != nil {
+				logger.File().Errorf("Error saving file to clowder, %s", err)
+				return
+			}
 		}
-
-		// send the check ping
-		if err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-			logger.File().Info("Error sending ping to clowder, %s", err)
-			return
-		}
-
-		// receive the check pong
-		_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
-		if err := clowder.conn.ReadJSON(clowder.status); err != nil {
-			logger.File().Info("Error receiving pong data from clowder, %s", err)
-			return
-		}
-
-		// TODO: Need to handle the received pong data
-		jsonString, _ := json.Marshal(clowder.status)
-		logger.Console().Printf("pong data: %s", jsonString)
 	}
 }
