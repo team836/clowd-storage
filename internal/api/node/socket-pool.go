@@ -87,9 +87,19 @@ func (pool *SocketPool) CheckAllClowders() {
 	now := time.Now()
 	for clowder := range pool.clowders {
 		// check whether if the clowder's current status is old
-		if now.After(clowder.lastPingAt.Add(pingCoolTime)) {
+		if now.After(clowder.Status.lastCheckedAt.Add(pingCoolTime)) {
 			pool.pingWaitGroup.Add(1)
-			clowder.Ping <- true
+			clowder.Ping <- true // try ping
+
+			select {
+			// ping request is buffered
+			// because this clowder's websocket is currently busy(processing save or load)
+			case <-clowder.Ping:
+				clowder.Status.isOld = true
+				pool.pingWaitGroup.Done()
+			// concurrently process ping request
+			default:
+			}
 		}
 	}
 
