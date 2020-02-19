@@ -45,10 +45,19 @@ And update metadata and predict clowders' status by scheduling results.
 This function change clowders' status. So you SHOULD use this function with
 the `ClowdersStatusLock` which is mutex for all clowders' status.
 */
-func (uq *UploadQueue) schedule(clowders *ring.Ring) (map[*node.Clowder][]*node.FileOnNode, error) {
+func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clowder][]*node.FileOnNode, error) {
+	// define constant for indicating current schedule phase
+	const (
+		PHASE1 = 1
+		PHASE2 = 2
+	)
+
+	phase := PHASE1
+
 	// sort the files to upload before scheduling
 	uq.sort()
 
+	currRing := safeRing
 	quotas := make(map[*node.Clowder][]*node.FileOnNode)
 	// for every files to save
 	for _, file := range uq.files {
@@ -56,18 +65,25 @@ func (uq *UploadQueue) schedule(clowders *ring.Ring) (map[*node.Clowder][]*node.
 		for _, shard := range file.data {
 			tolerance := 0
 			// find the clowder which can store this shard
-			for clowders.Value.(*node.Clowder).Status.Capacity < uint64(len(shard)) {
-				tolerance++
-				if tolerance >= clowders.Len() {
-					// reach at this point when
-					// no longer there are not exist possible clowders
-					return nil, errors.New("cannot save the files because of lack of storage space")
-				}
+			for currRing.Value.(*node.Clowder).Status.Capacity < uint64(len(shard)) {
+				currRing = currRing.Next()
 
-				clowders = clowders.Next()
+				tolerance++
+				if tolerance >= currRing.Len() {
+					if phase == PHASE1 {
+						// change to phase2 when
+						// no longer there are none possible things among the safe clowders
+						phase = PHASE2
+						currRing = unsafeRing
+					} else if phase == PHASE2 {
+						// reach at this point when
+						// no longer there are none possible things among the all clowders
+						return nil, errors.New("cannot save the files because of lack of storage space")
+					}
+				}
 			}
 
-			currClowder := clowders.Value.(*node.Clowder)
+			currClowder := currRing.Value.(*node.Clowder)
 
 			// assignment shard to this clowder
 			quotas[currClowder] = append(
@@ -80,7 +96,7 @@ func (uq *UploadQueue) schedule(clowders *ring.Ring) (map[*node.Clowder][]*node.
 			// clowder status prediction
 			currClowder.Status.Capacity -= uint64(len(shard))
 
-			clowders = clowders.Next()
+			currRing = currRing.Next()
 		}
 	}
 

@@ -72,7 +72,7 @@ func upload(ctx echo.Context) error {
 
 	// schedule saving for every shards to the clowders
 	// and get results
-	quotas, err := uq.schedule(clowders)
+	quotas, err := uq.schedule(safeRing, unsafeRing)
 	if err != nil {
 		logger.File().Error(err)
 		return ctx.String(http.StatusNotAcceptable, err.Error())
