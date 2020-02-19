@@ -64,8 +64,8 @@ func upload(ctx echo.Context) error {
 	node.Pool().CheckAllClowders()
 
 	// node selection
-	clowders := node.Pool().SelectClowders()
-	if clowders.Len() == 0 {
+	safeRing, unsafeRing := node.Pool().SelectClowders()
+	if safeRing.Len()+unsafeRing.Len() == 0 {
 		logger.File().Errorf("Available clowders are not exist.")
 		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available clowders")
 	}
