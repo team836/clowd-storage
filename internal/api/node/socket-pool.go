@@ -104,19 +104,28 @@ Select the clowders to save the files and sort them by node selection algorithm.
 Return type is ring, which is circular list, because select the clowders until
 all shards are scheduled.
 
+The first return value is the safe clowders that have latest(reliable) status.
+The second return value is the unsafe clowders that have old(unreliable) status.
+
 This function read clowders' status at specific time. So you SHOULD use this function with
 the `ClowdersStatusLock` which is mutex for all clowders' status.
 */
-func (pool *SocketPool) SelectClowders() *ring.Ring {
-	// TODO: implement node selection algorithm
-	r := ring.New(len(pool.clowders))
+func (pool *SocketPool) SelectClowders() (*ring.Ring, *ring.Ring) {
+	safeClowders := make(map[*Clowder]bool)
+	unsafeClowders := make(map[*Clowder]bool)
 
+	// separate clowder list by whether status is old or not
 	for clowder := range pool.clowders {
-		r.Value = clowder
-		r = r.Next()
+		if clowder.Status.isOld {
+			unsafeClowders[clowder] = true
+		} else {
+			safeClowders[clowder] = true
+		}
 	}
 
-	return r
+	// TODO: implement node selection algorithm
+
+	return mapToRing(safeClowders), mapToRing(unsafeClowders)
 }
 
 /**
@@ -134,4 +143,17 @@ func (pool *SocketPool) run() {
 			delete(pool.clowders, clowder)
 		}
 	}
+}
+
+/**
+Convert map to ring.
+*/
+func mapToRing(m map[*Clowder]bool) *ring.Ring {
+	r := ring.New(len(m))
+	for key := range m {
+		r.Value = key
+		r = r.Next()
+	}
+
+	return r
 }
