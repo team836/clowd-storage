@@ -59,21 +59,13 @@ func newSocketPool() *SocketPool {
 	return pool
 }
 
-/**
-Run the pool operations using non-blocking channels.
-
-register: register the clowder to pool
-unregister: unregister the clowder from pool
-*/
-func (pool *SocketPool) run() {
-	for {
-		select {
-		case clowder := <-pool.register:
-			pool.clowders[clowder] = true
-		case clowder := <-pool.unregister:
-			delete(pool.clowders, clowder)
-		}
+func (pool *SocketPool) TotalCapacity() uint64 {
+	var cap uint64 = 0
+	for clowder := range pool.clowders {
+		cap += clowder.Status.Capacity
 	}
+
+	return cap
 }
 
 /**
@@ -125,4 +117,21 @@ func (pool *SocketPool) SelectClowders() *ring.Ring {
 	}
 
 	return r
+}
+
+/**
+Run the pool operations using non-blocking channels.
+
+register: register the clowder to pool
+unregister: unregister the clowder from pool
+*/
+func (pool *SocketPool) run() {
+	for {
+		select {
+		case clowder := <-pool.register:
+			pool.clowders[clowder] = true
+		case clowder := <-pool.unregister:
+			delete(pool.clowders, clowder)
+		}
+	}
 }
