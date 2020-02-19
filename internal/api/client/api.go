@@ -74,15 +74,15 @@ func upload(ctx echo.Context) error {
 	// and get results
 	quotas := uq.schedule(clowders)
 
-	// end of mutex area
-	node.Pool().ClowdersStatusLock.Unlock()
-
 	// save each quota using goroutine
 	for clowder, file := range quotas {
 		go func(c *node.Clowder, f []*node.FileOnNode) {
 			c.SaveFile <- f
 		}(clowder, file)
 	}
+
+	// end of mutex area
+	node.Pool().ClowdersStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
 }
