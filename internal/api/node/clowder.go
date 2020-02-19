@@ -28,6 +28,12 @@ type Status struct {
 
 	// available capacity of the clowder (Byte)
 	Capacity uint64 `json:"capacity"`
+
+	// last checked time for this status
+	lastCheckedAt time.Time
+
+	// whether this status is old or not
+	isOld bool
 }
 
 type FileOnNode struct {
@@ -46,9 +52,6 @@ type Clowder struct {
 	// save file on the clowder
 	SaveFile chan []*FileOnNode
 
-	// last ping time
-	lastPingAt time.Time
-
 	// websocket connection
 	conn *websocket.Conn
 }
@@ -63,11 +66,13 @@ func NewFileOnNode(name string, data []byte) *FileOnNode {
 
 func NewClowder(conn *websocket.Conn) *Clowder {
 	c := &Clowder{
-		Status:     &Status{},
-		Ping:       make(chan bool),
-		SaveFile:   make(chan []*FileOnNode),
-		lastPingAt: time.Now().Add(-24 * time.Hour),
-		conn:       conn,
+		Status: &Status{
+			lastCheckedAt: time.Now().Add(-24 * time.Hour),
+			isOld:         true,
+		},
+		Ping:     make(chan bool, 1), // buffered channel for trying ping
+		SaveFile: make(chan []*FileOnNode),
+		conn:     conn,
 	}
 
 	return c
@@ -105,7 +110,8 @@ func (clowder *Clowder) run() {
 
 			// TODO: need to update RTT
 
-			clowder.lastPingAt = time.Now() // update last ping time
+			clowder.Status.lastCheckedAt = time.Now() // update last ping time
+			clowder.Status.isOld = false
 			pool.pingWaitGroup.Done()
 		case files := <-clowder.SaveFile:
 			_ = clowder.conn.SetWriteDeadline(time.Now().Add(saveWait))
