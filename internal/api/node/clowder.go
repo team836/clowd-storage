@@ -46,6 +46,9 @@ type Clowder struct {
 	// save file on the clowder
 	SaveFile chan []*FileOnNode
 
+	// last ping time
+	lastPingAt time.Time
+
 	// websocket connection
 	conn *websocket.Conn
 }
@@ -60,10 +63,11 @@ func NewFileOnNode(name string, data []byte) *FileOnNode {
 
 func NewClowder(conn *websocket.Conn) *Clowder {
 	c := &Clowder{
-		Status:   &Status{},
-		Ping:     make(chan bool),
-		SaveFile: make(chan []*FileOnNode),
-		conn:     conn,
+		Status:     &Status{},
+		Ping:       make(chan bool),
+		SaveFile:   make(chan []*FileOnNode),
+		lastPingAt: time.Now().Add(-24 * time.Hour),
+		conn:       conn,
 	}
 
 	return c
@@ -101,6 +105,7 @@ func (clowder *Clowder) run() {
 
 			// TODO: need to update RTT
 
+			clowder.lastPingAt = time.Now() // update last ping time
 			pool.pingWaitGroup.Done()
 		case files := <-clowder.SaveFile:
 			_ = clowder.conn.SetWriteDeadline(time.Now().Add(saveWait))

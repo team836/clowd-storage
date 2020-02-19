@@ -30,9 +30,6 @@ type SocketPool struct {
 
 	// unregister requests from the clowder
 	unregister chan *Clowder
-
-	// last ping time
-	lastPingAt time.Time
 }
 
 /**
@@ -54,7 +51,6 @@ func newSocketPool() *SocketPool {
 		clowders:   make(map[*Clowder]bool),
 		register:   make(chan *Clowder),
 		unregister: make(chan *Clowder),
-		lastPingAt: time.Now().Add(-24 * time.Hour),
 	}
 
 	// run the pool operations concurrently
@@ -81,19 +77,17 @@ func (pool *SocketPool) run() {
 }
 
 /**
-Send ping concurrently to all registered clowders for checking clowders' status
-and wait for all pong response to finish.
+Send ping concurrently to clowders whose current status is old
+and wait for all pong response.
 
 This function change clowders' status. So you SHOULD use this function with
 the `ClowdersStatusLock` which is mutex for all clowders' status.
 */
 func (pool *SocketPool) CheckAllClowders() {
-	// check ping cool time
-	if time.Now().After(pool.lastPingAt.Add(pingCoolTime)) {
-		// update last ping time
-		pool.lastPingAt = time.Now()
-
-		for clowder := range pool.clowders {
+	now := time.Now()
+	for clowder := range pool.clowders {
+		// check whether if the clowder's current status is old
+		if now.After(clowder.lastPingAt.Add(pingCoolTime)) {
 			pool.pingWaitGroup.Add(1)
 			clowder.Ping <- true
 		}
