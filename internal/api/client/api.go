@@ -59,6 +59,7 @@ func upload(ctx echo.Context) error {
 	// this area almost change all clowders' status
 	// so, protect it using mutex for all clowder's status
 	node.Pool().ClowdersStatusLock.Lock()
+	defer node.Pool().ClowdersStatusLock.Unlock()
 
 	// check all clowders' status by ping&pong
 	node.Pool().CheckAllClowders()
@@ -84,9 +85,6 @@ func upload(ctx echo.Context) error {
 			c.SaveFile <- f
 		}(clowder, file)
 	}
-
-	// end of mutex area
-	node.Pool().ClowdersStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
 }
