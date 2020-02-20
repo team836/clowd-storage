@@ -10,10 +10,8 @@ type File struct {
 	GoogleID   string    `gorm:"type:varchar(63);primary_key"`
 	Name       string    `gorm:"type:varchar(255);primary_key"`
 	Order      int16     `gorm:"type:smallint(5);primary_key"`
-	Size       uint64    `gorm:"type:bigint(14) unsigned;not_null"`
+	Size       uint64    `gorm:"type:bigint(14) unsigned;not null"`
 	UploadedAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
-
-	Clowdee Clowdee `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`
 }
 
 /**
@@ -25,5 +23,5 @@ func MigrateFile() {
 		Set("gorm:table_options", "CHARSET=utf8mb4").
 		AutoMigrate(&File{}).
 		Model(&File{}).
-		AddForeignKey("google_id", "clowdee(google_id)", "RESTRICT", "CASCADE")
+		AddForeignKey("google_id", "clowdees(google_id)", "RESTRICT", "CASCADE")
 }
