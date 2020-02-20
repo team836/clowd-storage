@@ -14,6 +14,7 @@ func DBService() *gorm.DB {
 	model.MigrateUser()
 	model.MigrateClowdee()
 	model.MigrateClowder()
+	model.MigrateFile()
 
 	return conn
 }
