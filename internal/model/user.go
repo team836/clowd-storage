@@ -9,6 +9,9 @@ type User struct {
 	Image    string `gorm:"type:varchar(255);not null"`
 }
 
+/**
+Migrate user table.
+*/
 func MigrateUser() {
 	database.
 		Conn().

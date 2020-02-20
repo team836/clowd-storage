@@ -10,9 +10,13 @@ type Clowdee struct {
 	GoogleID   string    `gorm:"type:varchar(63);primary_key"`
 	SignedInAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 	SignedUpAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
-	User       User      `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`
+
+	User User `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`
 }
 
+/**
+Migrate clowdee table.
+*/
 func MigrateClowdee() {
 	database.
 		Conn().

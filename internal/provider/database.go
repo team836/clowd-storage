@@ -13,6 +13,7 @@ func DBService() *gorm.DB {
 	conn := database.Conn()
 	model.MigrateUser()
 	model.MigrateClowdee()
+	model.MigrateClowder()
 
 	return conn
 }
