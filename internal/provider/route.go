@@ -4,6 +4,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/team836/clowd-storage/internal/api/middleware/auth"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
@@ -41,6 +43,7 @@ func RouteService() *echo.Echo {
 		}),
 		middleware.Recover(),
 		middleware.Secure(),
+		middleware.JWTWithConfig(*auth.Jwtconfig()),
 	}
 
 	// register middleware & handlers

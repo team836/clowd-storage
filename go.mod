@@ -3,6 +3,7 @@ module github.com/team836/clowd-storage
 go 1.13
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gorilla/websocket v1.4.0
 	github.com/jinzhu/gorm v1.9.12
 	github.com/klauspost/cpuid v1.2.3 // indirect
