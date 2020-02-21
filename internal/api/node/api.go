@@ -3,6 +3,8 @@ package node
 import (
 	"net/http"
 
+	"github.com/team836/clowd-storage/internal/model"
+
 	"github.com/team836/clowd-storage/pkg/logger"
 
 	"github.com/gorilla/websocket"
@@ -36,9 +38,11 @@ func openWebsocket(ctx echo.Context) error {
 		return err
 	}
 
-	clowder := NewClowder(conn) // create new clowder
-	go clowder.run()            // run the websocket operations
-	Pool().register <- clowder  // register this clowder to pool
+	// create new clowder
+	clowder := NewClowder(conn, ctx.Get("clowder").(*model.Clowder))
+
+	go clowder.run()           // run the websocket operations
+	Pool().register <- clowder // register this clowder to pool
 
 	return nil
 }

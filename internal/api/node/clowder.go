@@ -3,6 +3,8 @@ package node
 import (
 	"time"
 
+	"github.com/team836/clowd-storage/internal/model"
+
 	"github.com/team836/clowd-storage/pkg/logger"
 
 	"github.com/gorilla/websocket"
@@ -42,6 +44,9 @@ type FileOnNode struct {
 }
 
 type Clowder struct {
+	// corresponding clowder model
+	Model *model.Clowder
+
 	// clowder status
 	Status *Status
 
@@ -61,11 +66,13 @@ func NewFileOnNode(name string, data []byte) *FileOnNode {
 		Name: name,
 		Data: data,
 	}
+
 	return fon
 }
 
-func NewClowder(conn *websocket.Conn) *Clowder {
+func NewClowder(conn *websocket.Conn, model *model.Clowder) *Clowder {
 	c := &Clowder{
+		Model: model,
 		Status: &Status{
 			lastCheckedAt: time.Now().Add(-24 * time.Hour),
 			isOld:         true,
