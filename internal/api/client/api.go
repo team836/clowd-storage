@@ -86,8 +86,13 @@ func upload(ctx echo.Context) error {
 	// and get results
 	quotas, err := uq.schedule(safeRing, unsafeRing)
 	if err != nil {
-		logger.File().Error(err)
-		return ctx.String(http.StatusNotAcceptable, err.Error())
+		logger.File().Errorf("Error scheduling upload, %s", err)
+
+		if err == ErrLackOfStorage {
+			return ctx.String(http.StatusNotAcceptable, err.Error())
+		}
+
+		return ctx.NoContent(http.StatusInternalServerError)
 	}
 
 	// save each quota using goroutine

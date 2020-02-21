@@ -12,6 +12,10 @@ import (
 	"github.com/team836/clowd-storage/internal/api/node"
 )
 
+var (
+	ErrLackOfStorage = errors.New("cannot save the files because of lack of storage space")
+)
+
 type FileHeader struct {
 	name  string
 	order int
@@ -73,6 +77,17 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 
 	// begin a transaction
 	tx := database.Conn().Begin()
+	defer func() {
+		// when panic is occurred, rollback all transactions
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// if cannot begin the transaction
+	if err := tx.Error; err != nil {
+		return nil, err
+	}
 
 	// for every files to save
 	for _, file := range uq.files {
@@ -83,7 +98,10 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 			Position: int16(file.header.order),
 			Size:     file.header.size,
 		}
-		tx.Create(fileModel)
+		if err := tx.Create(fileModel).Error; err != nil {
+			tx.Rollback()
+			return nil, err
+		}
 
 		// for every shards
 		for pos, shard := range file.data {
@@ -103,7 +121,7 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 						// reach at this point when
 						// no longer there are none possible things among the all clowders
 						tx.Rollback() // rollback the transaction
-						return nil, errors.New("cannot save the files because of lack of storage space")
+						return nil, ErrLackOfStorage
 					}
 				}
 			}
@@ -118,7 +136,10 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 				ClowderGoogleID: currClowder.Model.GoogleID,
 			}
 			shardModel.DecideName()
-			tx.Create(shardModel)
+			if err := tx.Create(shardModel).Error; err != nil {
+				tx.Rollback()
+				return nil, err
+			}
 
 			// assignment shard to this clowder
 			quotas[currClowder] = append(
