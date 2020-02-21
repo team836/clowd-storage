@@ -43,7 +43,7 @@ func RouteService() *echo.Echo {
 		}),
 		middleware.Recover(),
 		middleware.Secure(),
-		middleware.JWTWithConfig(auth.JWTConfig),
+		middleware.JWTWithConfig(auth.JWTConfig), // middleware for jwt authentication
 	}
 
 	// register middleware & handlers

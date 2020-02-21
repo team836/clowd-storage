@@ -20,8 +20,8 @@ var JWTConfig = middleware.JWTConfig{
 JWTCustomClaims are custom claims extending default ones.
 */
 type JWTCustomClaims struct {
-	ID   string `json:"sub"`
-	Name string `json:"aud"`
+	UserID   string `json:"sub"`
+	UserName string `json:"aud"`
 	jwt.StandardClaims
 }
 
