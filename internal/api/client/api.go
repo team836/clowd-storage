@@ -2,6 +2,9 @@ package client
 
 import (
 	"net/http"
+	"time"
+
+	"github.com/team836/clowd-storage/pkg/database"
 
 	"github.com/team836/clowd-storage/internal/model"
 
@@ -20,7 +23,14 @@ type FileOnClient struct {
 	Data  string `json:"data"` // base64 encoded
 }
 
+type FileView struct {
+	Name       string    `json:"name"`
+	Size       uint      `json:"size"`
+	UploadedAt time.Time `json:"uploadedAt"`
+}
+
 func RegisterHandlers(group *echo.Group) {
+	group.GET("/files", fileList)
 	group.POST("/file", upload)
 }
 
@@ -113,4 +123,29 @@ func upload(ctx echo.Context) error {
 	node.Pool().ClowdersStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
+}
+
+/**
+Get clowdee's all uploaded file list.
+*/
+func fileList(ctx echo.Context) error {
+	clowdee := ctx.Get("clowdee").(*model.Clowdee)
+
+	fileList := &[]*FileView{}
+
+	// find from database
+	sqlResult := database.Conn().
+		Table("files").
+		Select("name, sum(size) as size, min(uploaded_at) as uploaded_at").
+		Where("google_id = ?", clowdee.GoogleID).
+		Group("name").
+		Scan(fileList)
+
+	// sql error occurred
+	if sqlResult.Error != nil && !sqlResult.RecordNotFound() {
+		logger.File().Errorf("Error finding the clowder's file list in database, %s", sqlResult.Error.Error())
+		return ctx.NoContent(http.StatusInternalServerError)
+	}
+
+	return ctx.JSON(http.StatusOK, fileList)
 }
