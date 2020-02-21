@@ -59,6 +59,9 @@ type Clowder struct {
 
 	// websocket connection
 	conn *websocket.Conn
+
+	// current clowder's machine id
+	machineID string
 }
 
 func NewFileOnNode(name string, data []byte) *FileOnNode {
@@ -70,16 +73,17 @@ func NewFileOnNode(name string, data []byte) *FileOnNode {
 	return fon
 }
 
-func NewClowder(conn *websocket.Conn, model *model.Clowder) *Clowder {
+func NewClowder(machineID string, conn *websocket.Conn, model *model.Clowder) *Clowder {
 	c := &Clowder{
 		Model: model,
 		Status: &Status{
 			lastCheckedAt: time.Now().Add(-24 * time.Hour),
 			isOld:         true,
 		},
-		Ping:     make(chan bool, 1), // buffered channel for trying ping
-		SaveFile: make(chan []*FileOnNode),
-		conn:     conn,
+		Ping:      make(chan bool, 1), // buffered channel for trying ping
+		SaveFile:  make(chan []*FileOnNode),
+		conn:      conn,
+		machineID: machineID,
 	}
 
 	return c
@@ -90,7 +94,6 @@ Run the websocket operations using non-blocking channels.
 */
 func (clowder *Clowder) run() {
 	defer func() {
-		_ = clowder.conn.Close()
 		pool.unregister <- clowder
 	}()
 
