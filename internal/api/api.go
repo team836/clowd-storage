@@ -8,11 +8,9 @@ import (
 )
 
 func RegisterHandlers(group *echo.Group) {
-	nodeGroup := group.Group("/node")
+	nodeGroup := group.Group("/node", auth.AuthenticateClowder)
 	node.RegisterHandlers(nodeGroup)
 
-	clientGroup := group.Group("/client")
+	clientGroup := group.Group("/client", auth.AuthenticateClowdee)
 	client.RegisterHandlers(clientGroup)
-
-	group.GET("", auth.CheckUser)
 }
