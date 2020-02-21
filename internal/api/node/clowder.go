@@ -90,7 +90,6 @@ Run the websocket operations using non-blocking channels.
 */
 func (clowder *Clowder) run() {
 	defer func() {
-		_ = clowder.conn.Close()
 		pool.unregister <- clowder
 	}()
 

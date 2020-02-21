@@ -140,6 +140,7 @@ func (pool *SocketPool) run() {
 		case clowder := <-pool.register:
 			pool.clowders[clowder] = true
 		case clowder := <-pool.unregister:
+			_ = clowder.conn.Close()
 			delete(pool.clowders, clowder)
 		}
 	}
