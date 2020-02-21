@@ -3,6 +3,8 @@ package client
 import (
 	"net/http"
 
+	"github.com/team836/clowd-storage/internal/model"
+
 	"github.com/team836/clowd-storage/pkg/errcorr"
 
 	"github.com/team836/clowd-storage/pkg/logger"
@@ -34,6 +36,8 @@ File upload requested by client(clowdee).
 - Finally save the files to the nodes.
 */
 func upload(ctx echo.Context) error {
+	clowdee := ctx.Get("clowdee").(*model.Clowdee)
+
 	// bind uploaded data into array of `FileOnClient` struct
 	files := &[]*FileOnClient{}
 	if err := ctx.Bind(files); err != nil {
@@ -42,7 +46,7 @@ func upload(ctx echo.Context) error {
 	}
 
 	// create upload queue
-	uq := newUQ()
+	uq := newUQ(clowdee)
 
 	// encode every file data using reed solomon algorithm
 	for _, file := range *files {
@@ -52,7 +56,14 @@ func upload(ctx echo.Context) error {
 			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
-		encFile := &EncFile{fileID: file.Name, data: shards}
+		encFile := &EncFile{
+			header: &FileHeader{
+				name:  file.Name,
+				order: file.Order,
+				size:  uint(len(file.Data)),
+			},
+			data: shards,
+		}
 		uq.push(encFile)
 	}
 

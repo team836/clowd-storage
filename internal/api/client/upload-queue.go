@@ -5,6 +5,10 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/team836/clowd-storage/pkg/database"
+
+	"github.com/team836/clowd-storage/internal/model"
+
 	"github.com/team836/clowd-storage/internal/api/node"
 )
 
@@ -66,10 +70,23 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 
 	currRing := safeRing
 	quotas := make(map[*node.Clowder][]*node.FileOnNode)
+
+	// begin a transaction
+	tx := database.Conn().Begin()
+
 	// for every files to save
 	for _, file := range uq.files {
+		// create the file record
+		fileModel := &model.File{
+			GoogleID: uq.clowdee.GoogleID,
+			Name:     file.header.name,
+			Position: int16(file.header.order),
+			Size:     file.header.size,
+		}
+		tx.Create(fileModel)
+
 		// for every shards
-		for _, shard := range file.data {
+		for pos, shard := range file.data {
 			tolerance := 0
 			// find the clowder which can store this shard
 			for currRing.Value.(*node.Clowder).Status.Capacity < uint64(len(shard)) {
@@ -85,17 +102,28 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 					} else if phase == PHASE2 {
 						// reach at this point when
 						// no longer there are none possible things among the all clowders
+						tx.Rollback() // rollback the transaction
 						return nil, errors.New("cannot save the files because of lack of storage space")
 					}
 				}
 			}
 
+			// set current clowder(node)
 			currClowder := currRing.Value.(*node.Clowder)
+
+			// create the shard record
+			shardModel := &model.Shard{
+				Position:        uint8(pos),
+				FileID:          fileModel.ID,
+				ClowderGoogleID: currClowder.Model.GoogleID,
+			}
+			shardModel.DecideName()
+			tx.Create(shardModel)
 
 			// assignment shard to this clowder
 			quotas[currClowder] = append(
 				quotas[currClowder],
-				node.NewFileOnNode("0", shard), // TODO: set valid file name
+				node.NewFileOnNode(shardModel.Name, shard), // TODO: set valid file name
 			)
 
 			// TODO: save metadata to the database using goroutine
@@ -106,6 +134,9 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 			currRing = currRing.Next()
 		}
 	}
+
+	// commit the transaction
+	tx.Commit()
 
 	return quotas, nil
 }
