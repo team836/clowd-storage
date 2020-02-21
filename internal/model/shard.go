@@ -6,8 +6,8 @@ import (
 
 type Shard struct {
 	Name            string `gorm:"type:varchar(255);primary_key"`
-	Position        uint8  `gorm:"type:tinyint(3) unsigned;not null"`
-	FileID          uint   `gorm:"type:int(11) unsigned;not null"`
+	Position        uint8  `gorm:"type:tinyint(3) unsigned;not null;unique_index:shard_idx"`
+	FileID          uint   `gorm:"type:int(11) unsigned;not null;unique_index:shard_idx"`
 	ClowderGoogleID string `gorm:"type:varchar(63);not null"`
 
 	Clowder Clowder `gorm:"foreignkey:ClowderGoogleID;association_foreignkey:GoogleID"` // shard belongs to clowder
