@@ -1,6 +1,10 @@
 package auth
 
 import (
+	"net/http"
+
+	"github.com/team836/clowd-storage/pkg/logger"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -30,8 +34,22 @@ Middleware for authenticating and returning the clowder.
 func AuthenticateClowder(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
 		userID := getUserID(ctx)
+
+		// find the clowder
 		clowder := &model.Clowder{}
-		database.Conn().First(clowder, userID)
+		sqlResult := database.Conn().Where(&model.Clowder{GoogleID: userID}).First(&clowder)
+
+		if sqlResult.Error != nil {
+			// if current user is not clowder
+			if sqlResult.RecordNotFound() {
+				return ctx.String(http.StatusUnauthorized, "Cannot authorize as clowder")
+			}
+
+			// other sql error
+			logger.File().Errorf("Error finding the clowder in database, %s", sqlResult.Error.Error())
+			return ctx.NoContent(http.StatusInternalServerError)
+		}
+
 		ctx.Set("clowder", clowder)
 
 		return next(ctx)
@@ -44,8 +62,22 @@ Middleware for authenticating and returning the clowdee.
 func AuthenticateClowdee(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
 		userID := getUserID(ctx)
+
+		// find the clowdee
 		clowdee := &model.Clowdee{}
-		database.Conn().First(clowdee, userID)
+		sqlResult := database.Conn().Where(&model.Clowdee{GoogleID: userID}).First(&clowdee)
+
+		if sqlResult.Error != nil {
+			// if current user is not clowdee
+			if sqlResult.RecordNotFound() {
+				return ctx.String(http.StatusUnauthorized, "Cannot authorize as clowdee")
+			}
+
+			// other sql error
+			logger.File().Errorf("Error finding the clowdee in database, %s", sqlResult.Error.Error())
+			return ctx.NoContent(http.StatusInternalServerError)
+		}
+
 		ctx.Set("clowdee", clowdee)
 
 		return next(ctx)

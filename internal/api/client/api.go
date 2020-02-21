@@ -3,6 +3,8 @@ package client
 import (
 	"net/http"
 
+	"github.com/team836/clowd-storage/internal/model"
+
 	"github.com/team836/clowd-storage/pkg/errcorr"
 
 	"github.com/team836/clowd-storage/pkg/logger"
@@ -34,6 +36,8 @@ File upload requested by client(clowdee).
 - Finally save the files to the nodes.
 */
 func upload(ctx echo.Context) error {
+	clowdee := ctx.Get("clowdee").(*model.Clowdee)
+
 	// bind uploaded data into array of `FileOnClient` struct
 	files := &[]*FileOnClient{}
 	if err := ctx.Bind(files); err != nil {
@@ -42,7 +46,7 @@ func upload(ctx echo.Context) error {
 	}
 
 	// create upload queue
-	uq := newUQ()
+	uq := newUQ(clowdee)
 
 	// encode every file data using reed solomon algorithm
 	for _, file := range *files {
@@ -52,14 +56,26 @@ func upload(ctx echo.Context) error {
 			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
-		encFile := &EncFile{fileID: file.Name, data: shards}
+		encFile := &EncFile{
+			header: &FileHeader{
+				name:  file.Name,
+				order: file.Order,
+				size:  uint(len(file.Data)),
+			},
+			data: shards,
+		}
 		uq.push(encFile)
 	}
 
 	// this area almost change all clowders' status
 	// so, protect it using mutex for all clowder's status
 	node.Pool().ClowdersStatusLock.Lock()
-	defer node.Pool().ClowdersStatusLock.Unlock()
+	defer func() {
+		// when panic is occurred, unlock the clowders status lock
+		if r := recover(); r != nil {
+			node.Pool().ClowdersStatusLock.Unlock()
+		}
+	}()
 
 	// check all clowders' status by ping&pong
 	node.Pool().CheckAllClowders()
@@ -67,6 +83,7 @@ func upload(ctx echo.Context) error {
 	// node selection
 	safeRing, unsafeRing := node.Pool().SelectClowders()
 	if safeRing.Len()+unsafeRing.Len() == 0 {
+		node.Pool().ClowdersStatusLock.Unlock()
 		logger.File().Errorf("Available clowders are not exist.")
 		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available clowders")
 	}
@@ -75,8 +92,14 @@ func upload(ctx echo.Context) error {
 	// and get results
 	quotas, err := uq.schedule(safeRing, unsafeRing)
 	if err != nil {
-		logger.File().Error(err)
-		return ctx.String(http.StatusNotAcceptable, err.Error())
+		node.Pool().ClowdersStatusLock.Unlock()
+		logger.File().Errorf("Error scheduling upload, %s", err)
+
+		if err == ErrLackOfStorage {
+			return ctx.String(http.StatusNotAcceptable, err.Error())
+		}
+
+		return ctx.NoContent(http.StatusInternalServerError)
 	}
 
 	// save each quota using goroutine
@@ -85,6 +108,9 @@ func upload(ctx echo.Context) error {
 			c.SaveFile <- f
 		}(clowder, file)
 	}
+
+	// end of mutex area for clowders status lock
+	node.Pool().ClowdersStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
 }
