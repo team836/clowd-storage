@@ -10,18 +10,19 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// jwtCustomClaims are custom claims extending default ones.
-type JwtCustomClaims struct {
+// JWTConfig authentication config
+var JWTConfig = middleware.JWTConfig{
+	Claims:     &JWTCustomClaims{},
+	SigningKey: []byte(viper.GetString("JWT.SECRET")),
+}
+
+/**
+JWTCustomClaims are custom claims extending default ones.
+*/
+type JWTCustomClaims struct {
 	ID   string `json:"sub"`
 	Name string `json:"aud"`
 	jwt.StandardClaims
-}
-
-// JWT authenticate config
-func Jwtconfig() *middleware.JWTConfig {
-	return &middleware.JWTConfig{
-		Claims:     &JwtCustomClaims{},
-		SigningKey: []byte(viper.GetString("JWT.SECRET"))}
 }
 
 // Document to Chihoon
@@ -30,7 +31,7 @@ func CheckUser(c echo.Context) error {
 	user := c.Get("user").(*jwt.Token)
 
 	// Make claims to Custom Claims
-	claims := user.Claims.(*JwtCustomClaims)
+	claims := user.Claims.(*JWTCustomClaims)
 
 	// Put value to variable from Custom Claims
 	name := claims.Name
