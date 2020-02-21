@@ -8,17 +8,24 @@ import (
 	"github.com/team836/clowd-storage/internal/api/node"
 )
 
+type FileHeader struct {
+	name  string
+	order int
+	size  uint
+}
+
 type EncFile struct {
-	fileID string
+	header *FileHeader
 	data   [][]byte
 }
 
 type UploadQueue struct {
-	files []*EncFile
+	clowdee *model.Clowdee
+	files   []*EncFile
 }
 
-func newUQ() *UploadQueue {
-	uq := &UploadQueue{}
+func newUQ(clowdee *model.Clowdee) *UploadQueue {
+	uq := &UploadQueue{clowdee: clowdee}
 	return uq
 }
 
