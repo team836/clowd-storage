@@ -7,10 +7,12 @@ import (
 )
 
 type Clowdee struct {
+	// column fields
 	GoogleID   string    `gorm:"type:varchar(63);primary_key"`
 	SignedInAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 	SignedUpAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 
+	// associations fields
 	User  User   `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"` // clowdee belongs to user
 	Files []File `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"` // clowdee has many files
 }
