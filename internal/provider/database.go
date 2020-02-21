@@ -11,6 +11,8 @@ Boot database service.
 */
 func DBService() *gorm.DB {
 	conn := database.Conn()
+
+	// migrate all schemas
 	model.MigrateUser()
 	model.MigrateClowdee()
 	model.MigrateClowder()

@@ -11,8 +11,8 @@ type Clowdee struct {
 	SignedInAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 	SignedUpAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 
-	User  User   `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`
-	Files []File `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`
+	User  User   `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"` // clowdee belongs to user
+	Files []File `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"` // clowdee has many files
 }
 
 /**

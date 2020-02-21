@@ -12,7 +12,8 @@ type Clowder struct {
 	SignedInAt  time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 	SignedUpAt  time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 
-	User User `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`
+	User   User    `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`        // clowder belongs to user
+	Shards []Shard `gorm:"foreignkey:ClowderGoogleID;association_foreignkey:GoogleID"` // clowder has many shards
 }
 
 /**
