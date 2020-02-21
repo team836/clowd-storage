@@ -1,6 +1,9 @@
 package model
 
 import (
+	"encoding/base64"
+	"strconv"
+
 	"github.com/team836/clowd-storage/pkg/database"
 )
 
@@ -24,4 +27,18 @@ func MigrateShard() {
 		Model(&Shard{}).
 		AddForeignKey("clowder_google_id", "clowders(google_id)", "RESTRICT", "CASCADE").
 		AddForeignKey("file_id", "files(id)", "RESTRICT", "CASCADE")
+}
+
+/**
+Decide shard name using combination of position and file id.
+*/
+func (shard *Shard) DecideName() {
+	uniqueBytes := []byte(
+		"p:" +
+			strconv.Itoa(int(shard.Position)) +
+			"f:" +
+			strconv.Itoa(int(shard.FileID)),
+	)
+
+	shard.Name = base64.URLEncoding.EncodeToString(uniqueBytes)
 }
