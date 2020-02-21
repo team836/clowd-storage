@@ -7,11 +7,13 @@ import (
 )
 
 type Clowder struct {
+	// column fields
 	GoogleID    string    `gorm:"type:varchar(63);primary_key"`
 	MaxCapacity uint16    `gorm:"type:smallint(4) unsigned;not null;default:0"`
 	SignedInAt  time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 	SignedUpAt  time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 
+	// associations fields
 	User   User    `gorm:"foreignkey:GoogleID;association_foreignkey:GoogleID"`        // clowder belongs to user
 	Shards []Shard `gorm:"foreignkey:ClowderGoogleID;association_foreignkey:GoogleID"` // clowder has many shards
 }
