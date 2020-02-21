@@ -1,13 +1,12 @@
 package auth
 
 import (
-	"net/http"
-
-	"github.com/labstack/echo/v4/middleware"
-	"github.com/spf13/viper"
-
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/spf13/viper"
+	"github.com/team836/clowd-storage/internal/model"
+	"github.com/team836/clowd-storage/pkg/database"
 )
 
 // JWTConfig authentication config
@@ -25,16 +24,41 @@ type JWTCustomClaims struct {
 	jwt.StandardClaims
 }
 
-// Document to Chihoon
-func CheckUser(c echo.Context) error {
-	// Get claims from the header
-	user := c.Get("user").(*jwt.Token)
+/**
+Middleware for authenticating and returning the clowder.
+*/
+func AuthenticateClowder(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(ctx echo.Context) error {
+		userID := getUserID(ctx)
+		clowder := &model.Clowder{}
+		database.Conn().First(clowder, userID)
+		ctx.Set("clowder", clowder)
 
-	// Make claims to Custom Claims
-	claims := user.Claims.(*JWTCustomClaims)
+		return next(ctx)
+	}
+}
 
-	// Put value to variable from Custom Claims
-	name := claims.Name
-	id := claims.ID
-	return c.String(http.StatusOK, "Welcome "+name+"!\n ID: "+id)
+/**
+Middleware for authenticating and returning the clowdee.
+*/
+func AuthenticateClowdee(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(ctx echo.Context) error {
+		userID := getUserID(ctx)
+		clowdee := &model.Clowdee{}
+		database.Conn().First(clowdee, userID)
+		ctx.Set("clowdee", clowdee)
+
+		return next(ctx)
+	}
+}
+
+/**
+Get user id from the context.
+*/
+func getUserID(ctx echo.Context) string {
+	// get claims from the header
+	token := ctx.Get("user").(*jwt.Token)
+	claims := token.Claims.(*JWTCustomClaims)
+
+	return claims.UserID
 }
