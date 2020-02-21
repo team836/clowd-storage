@@ -7,9 +7,10 @@ import (
 )
 
 type File struct {
-	GoogleID   string    `gorm:"type:varchar(63);primary_key"`
-	Name       string    `gorm:"type:varchar(255);primary_key"`
-	Order      int16     `gorm:"type:smallint(5);primary_key"`
+	ID         uint      `gorm:"type:int(11) unsigned auto_increment;primary_key"`
+	GoogleID   string    `gorm:"type:varchar(63);not null;unique_index:file_idx"`
+	Name       string    `gorm:"type:varchar(255);not null;unique_index:file_idx"`
+	Position   int16     `gorm:"type:smallint(5);not null;unique_index:file_idx"`
 	Size       uint64    `gorm:"type:bigint(14) unsigned;not null"`
 	UploadedAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
 }
