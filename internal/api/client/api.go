@@ -70,7 +70,12 @@ func upload(ctx echo.Context) error {
 	// this area almost change all clowders' status
 	// so, protect it using mutex for all clowder's status
 	node.Pool().ClowdersStatusLock.Lock()
-	defer node.Pool().ClowdersStatusLock.Unlock()
+	defer func() {
+		// when panic is occurred, unlock the clowders status lock
+		if r := recover(); r != nil {
+			node.Pool().ClowdersStatusLock.Unlock()
+		}
+	}()
 
 	// check all clowders' status by ping&pong
 	node.Pool().CheckAllClowders()
@@ -78,6 +83,7 @@ func upload(ctx echo.Context) error {
 	// node selection
 	safeRing, unsafeRing := node.Pool().SelectClowders()
 	if safeRing.Len()+unsafeRing.Len() == 0 {
+		node.Pool().ClowdersStatusLock.Unlock()
 		logger.File().Errorf("Available clowders are not exist.")
 		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available clowders")
 	}
@@ -86,6 +92,7 @@ func upload(ctx echo.Context) error {
 	// and get results
 	quotas, err := uq.schedule(safeRing, unsafeRing)
 	if err != nil {
+		node.Pool().ClowdersStatusLock.Unlock()
 		logger.File().Errorf("Error scheduling upload, %s", err)
 
 		if err == ErrLackOfStorage {
@@ -101,6 +108,9 @@ func upload(ctx echo.Context) error {
 			c.SaveFile <- f
 		}(clowder, file)
 	}
+
+	// end of mutex area for clowders status lock
+	node.Pool().ClowdersStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
 }
