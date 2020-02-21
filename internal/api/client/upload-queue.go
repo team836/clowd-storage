@@ -123,10 +123,8 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 			// assignment shard to this clowder
 			quotas[currClowder] = append(
 				quotas[currClowder],
-				node.NewFileOnNode(shardModel.Name, shard), // TODO: set valid file name
+				node.NewFileOnNode(shardModel.Name, shard),
 			)
-
-			// TODO: save metadata to the database using goroutine
 
 			// clowder status prediction
 			currClowder.Status.Capacity -= uint64(len(shard))
