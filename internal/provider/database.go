@@ -16,6 +16,7 @@ func DBService() *gorm.DB {
 	model.MigrateUser()
 	model.MigrateClowdee()
 	model.MigrateClowder()
+	model.MigrateNode()
 	model.MigrateFile()
 	model.MigrateShard()
 

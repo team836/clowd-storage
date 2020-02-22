@@ -29,6 +29,10 @@ type FileView struct {
 	UploadedAt time.Time `json:"uploadedAt"`
 }
 
+type FileToDownload struct {
+	Name string `json:"name"`
+}
+
 func RegisterHandlers(group *echo.Group) {
 	group.GET("/dir", fileList)
 	group.POST("/files", upload)
@@ -151,6 +155,18 @@ func fileList(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, fileList)
 }
 
+/**
+File download requested by client(clowdee).
+*/
 func download(ctx echo.Context) error {
+	clowdee := ctx.Get("clowdee").(*model.Clowdee)
+
+	// bind download list
+	downloadList := &[]*FileToDownload{}
+	if err := ctx.Bind(downloadList); err != nil {
+		logger.File().Infof("Error binding client's download list, %s", err)
+		return err
+	}
+
 	return nil
 }
