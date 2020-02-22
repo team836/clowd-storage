@@ -1,6 +1,7 @@
 package errcorr
 
 import (
+	"bytes"
 	"encoding/base64"
 
 	"github.com/klauspost/reedsolomon"
@@ -38,4 +39,31 @@ func Encode(data string) ([][]byte, error) {
 	}
 
 	return splitData, nil
+}
+
+/**
+Decode the shards to the original file using reed solomon algorithm.
+When some data are missed, reconstruct them.
+*/
+func Decode(shards [][]byte, dataSize int) (string, error) {
+	// create read solomon encoder
+	enc, _ := reedsolomon.New(dataShards, parityShards)
+
+	// decode(reconstruct) the missing shards
+	err := enc.Reconstruct(shards)
+	if err != nil {
+		return "", err
+	}
+
+	// join the shards
+	buf := &bytes.Buffer{}
+	err = enc.Join(buf, shards, dataSize)
+	if err != nil {
+		return "", err
+	}
+
+	// make base64 string from byte buffer
+	data := base64.StdEncoding.EncodeToString(buf.Bytes())
+
+	return data, nil
 }
