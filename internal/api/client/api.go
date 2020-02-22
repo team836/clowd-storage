@@ -178,6 +178,8 @@ func download(ctx echo.Context) error {
 			if err == cwde.ErrFileNotExist {
 				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
 			}
+
+			return ctx.NoContent(http.StatusInternalServerError)
 		}
 	}
 
