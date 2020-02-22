@@ -19,9 +19,6 @@ type File struct {
 	Position   int16     `gorm:"type:smallint(5);not null;unique_index:file_idx"`
 	Size       uint      `gorm:"type:int(11) unsigned;not null"`
 	UploadedAt time.Time `gorm:"type:datetime;not null;default:current_timestamp"`
-
-	// associations fields
-	Shards []Shard `gorm:"foreignkey:FileID;association_foreignkey:ID"` // file has many shards
 }
 
 /**
