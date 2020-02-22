@@ -2,6 +2,8 @@ package client
 
 import (
 	"container/ring"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"sort"
 
@@ -54,13 +56,13 @@ func (uq *UploadQueue) sort() {
 }
 
 /**
-Assign every data shards for saving to the clowders.
-And update metadata and predict clowders' status by scheduling results.
+Assign every data shards for saving to the nodes.
+And update metadata and predict nodes' status by scheduling results.
 
-This function change clowders' status. So you SHOULD use this function with
-the `ClowdersStatusLock` which is mutex for all clowders' status.
+This function change nodes' status. So you SHOULD use this function with
+the `NodesStatusLock` which is mutex for all nodes' status.
 */
-func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clowder][]*node.FileOnNode, error) {
+func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node][]*node.FileOnNode, error) {
 	// define constant for indicating current schedule phase
 	const (
 		PHASE1 = 1
@@ -73,7 +75,7 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 	uq.sort()
 
 	currRing := safeRing
-	quotas := make(map[*node.Clowder][]*node.FileOnNode)
+	quotas := make(map[*node.Node][]*node.FileOnNode)
 
 	// begin a transaction
 	tx := database.Conn().Begin()
@@ -106,34 +108,35 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 		// for every shards
 		for pos, shard := range file.data {
 			tolerance := 0
-			// find the clowder which can store this shard
-			for currRing.Value.(*node.Clowder).Status.Capacity < uint64(len(shard)) {
+			// find the node which can store this shard
+			for currRing.Value.(*node.Node).Status.Capacity < uint64(len(shard)) {
 				currRing = currRing.Next()
 
 				tolerance++
 				if tolerance >= currRing.Len() {
 					if phase == PHASE1 {
 						// change to phase2 when
-						// no longer there are none possible things among the safe clowders
+						// no longer there are none possible things among the safe nodes
 						phase = PHASE2
 						currRing = unsafeRing
 					} else if phase == PHASE2 {
 						// reach at this point when
-						// no longer there are none possible things among the all clowders
+						// no longer there are none possible things among the all nodes
 						tx.Rollback() // rollback the transaction
 						return nil, ErrLackOfStorage
 					}
 				}
 			}
 
-			// set current clowder(node)
-			currClowder := currRing.Value.(*node.Clowder)
+			// set current node
+			currNode := currRing.Value.(*node.Node)
 
 			// create the shard record
 			shardModel := &model.Shard{
-				Position:        uint8(pos),
-				FileID:          fileModel.ID,
-				ClowderGoogleID: currClowder.Model.GoogleID,
+				Position:  uint8(pos),
+				FileID:    fileModel.ID,
+				MachineID: currNode.Model.MachineID,
+				Checksum:  checksum(shard),
 			}
 			shardModel.DecideName()
 			if err := tx.Create(shardModel).Error; err != nil {
@@ -141,14 +144,14 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 				return nil, err
 			}
 
-			// assignment shard to this clowder
-			quotas[currClowder] = append(
-				quotas[currClowder],
+			// assignment shard to this node
+			quotas[currNode] = append(
+				quotas[currNode],
 				node.NewFileOnNode(shardModel.Name, shard),
 			)
 
-			// clowder status prediction
-			currClowder.Status.Capacity -= uint64(len(shard))
+			// node status prediction
+			currNode.Status.Capacity -= uint64(len(shard))
 
 			currRing = currRing.Next()
 		}
@@ -158,4 +161,13 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Clow
 	tx.Commit()
 
 	return quotas, nil
+}
+
+/**
+Generate sha256 checksum about the shard.
+*/
+func checksum(data []byte) string {
+	hash := sha256.Sum256(data)
+
+	return hex.EncodeToString(hash[:])
 }
