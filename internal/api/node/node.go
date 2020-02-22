@@ -28,7 +28,7 @@ type Status struct {
 	// network bandwidth (Mbps)
 	Bandwidth uint `json:"bandwidth"`
 
-	// available capacity of the clowder (Byte)
+	// available capacity of the node (Byte)
 	Capacity uint64 `json:"capacity"`
 
 	// last checked time for this status
@@ -43,25 +43,22 @@ type FileOnNode struct {
 	Data []byte `json:"data"`
 }
 
-type Clowder struct {
-	// corresponding clowder model
-	Model *model.Clowder
+type Node struct {
+	// corresponding node model
+	Model *model.Node
 
-	// clowder status
+	// node status
 	Status *Status
 
-	// send check ping to the clowder and receive the clowder's information
+	// send check ping to the node and receive the node's information
 	// It SHOULD be buffered channel for non-blocking at the socket pool
 	Ping chan bool
 
-	// save file on the clowder
+	// save file on the node
 	SaveFile chan []*FileOnNode
 
 	// websocket connection
 	conn *websocket.Conn
-
-	// current clowder's machine id
-	machineID string
 }
 
 func NewFileOnNode(name string, data []byte) *FileOnNode {
@@ -73,17 +70,16 @@ func NewFileOnNode(name string, data []byte) *FileOnNode {
 	return fon
 }
 
-func NewClowder(machineID string, conn *websocket.Conn, model *model.Clowder) *Clowder {
-	c := &Clowder{
+func NewNode(conn *websocket.Conn, model *model.Node) *Node {
+	c := &Node{
 		Model: model,
 		Status: &Status{
 			lastCheckedAt: time.Now().Add(-24 * time.Hour),
 			isOld:         true,
 		},
-		Ping:      make(chan bool, 1), // buffered channel for trying ping
-		SaveFile:  make(chan []*FileOnNode),
-		conn:      conn,
-		machineID: machineID,
+		Ping:     make(chan bool, 1), // buffered channel for trying ping
+		SaveFile: make(chan []*FileOnNode),
+		conn:     conn,
 	}
 
 	return c
@@ -92,42 +88,42 @@ func NewClowder(machineID string, conn *websocket.Conn, model *model.Clowder) *C
 /**
 Run the websocket operations using non-blocking channels.
 */
-func (clowder *Clowder) run() {
+func (node *Node) run() {
 	defer func() {
-		pool.unregister <- clowder
+		pool.unregister <- node
 	}()
 
 	for {
 		select {
-		case <-clowder.Ping:
-			clowder.conn.SetReadLimit(maxPongSize)
+		case <-node.Ping:
+			node.conn.SetReadLimit(maxPongSize)
 
 			// send the check ping
-			_ = clowder.conn.SetWriteDeadline(time.Now().Add(pingWait))
-			if err := clowder.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-				logger.File().Infof("Error sending ping to clowder, %s", err)
+			_ = node.conn.SetWriteDeadline(time.Now().Add(pingWait))
+			if err := node.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				logger.File().Infof("Error sending ping to node, %s", err)
 				pool.pingWaitGroup.Done()
 				return
 			}
 
 			// receive the check pong
-			_ = clowder.conn.SetReadDeadline(time.Now().Add(pongWait))
-			if err := clowder.conn.ReadJSON(clowder.Status); err != nil {
-				logger.File().Infof("Error receiving pong data from clowder, %s", err)
+			_ = node.conn.SetReadDeadline(time.Now().Add(pongWait))
+			if err := node.conn.ReadJSON(node.Status); err != nil {
+				logger.File().Infof("Error receiving pong data from node, %s", err)
 				pool.pingWaitGroup.Done()
 				return
 			}
 
 			// TODO: need to update RTT
 
-			clowder.Status.lastCheckedAt = time.Now() // update last ping time
-			clowder.Status.isOld = false
+			node.Status.lastCheckedAt = time.Now() // update last ping time
+			node.Status.isOld = false
 			pool.pingWaitGroup.Done()
-		case files := <-clowder.SaveFile:
-			_ = clowder.conn.SetWriteDeadline(time.Now().Add(saveWait))
+		case files := <-node.SaveFile:
+			_ = node.conn.SetWriteDeadline(time.Now().Add(saveWait))
 			// byte array data are send as base64 encoded format
-			if err := clowder.conn.WriteJSON(files); err != nil {
-				logger.File().Errorf("Error saving file to clowder, %s", err)
+			if err := node.conn.WriteJSON(files); err != nil {
+				logger.File().Errorf("Error saving file to node, %s", err)
 				return
 			}
 		}
