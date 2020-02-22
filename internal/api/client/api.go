@@ -44,7 +44,7 @@ File upload requested by client(clowdee).
 
 - Get uploaded file.
 - Run Reed-Solomon algorithm to each files.
-- Check all nodes(clowders)' status by ping and pong.
+- Check all nodes' status by ping and pong.
 - By all nodes' status, run the node selection.
 - Schedule saving for every shards.
 - Update the selected nodes' status by prediction.
@@ -82,32 +82,32 @@ func upload(ctx echo.Context) error {
 		uq.push(encFile)
 	}
 
-	// this area almost change all clowders' status
-	// so, protect it using mutex for all clowder's status
-	node.Pool().ClowdersStatusLock.Lock()
+	// this area almost change all nodes' status
+	// so, protect it using mutex for all node's status
+	node.Pool().NodesStatusLock.Lock()
 	defer func() {
-		// when panic is occurred, unlock the clowders status lock
+		// when panic is occurred, unlock the nodes status lock
 		if r := recover(); r != nil {
-			node.Pool().ClowdersStatusLock.Unlock()
+			node.Pool().NodesStatusLock.Unlock()
 		}
 	}()
 
-	// check all clowders' status by ping&pong
-	node.Pool().CheckAllClowders()
+	// check all nodes' status by ping&pong
+	node.Pool().CheckAllNodes()
 
 	// node selection
-	safeRing, unsafeRing := node.Pool().SelectClowders()
+	safeRing, unsafeRing := node.Pool().SelectNodes()
 	if safeRing.Len()+unsafeRing.Len() == 0 {
-		node.Pool().ClowdersStatusLock.Unlock()
-		logger.File().Errorf("Available clowders are not exist.")
-		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available clowders")
+		node.Pool().NodesStatusLock.Unlock()
+		logger.File().Errorf("Available nodes are not exist.")
+		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available nodes")
 	}
 
-	// schedule saving for every shards to the clowders
+	// schedule saving for every shards to the nodes
 	// and get results
 	quotas, err := uq.schedule(safeRing, unsafeRing)
 	if err != nil {
-		node.Pool().ClowdersStatusLock.Unlock()
+		node.Pool().NodesStatusLock.Unlock()
 		logger.File().Errorf("Error scheduling upload, %s", err)
 
 		if err == ErrLackOfStorage {
@@ -118,14 +118,14 @@ func upload(ctx echo.Context) error {
 	}
 
 	// save each quota using goroutine
-	for clowder, file := range quotas {
-		go func(c *node.Clowder, f []*node.FileOnNode) {
-			c.SaveFile <- f
-		}(clowder, file)
+	for nodeToSave, file := range quotas {
+		go func(n *node.Node, f []*node.FileOnNode) {
+			n.SaveFile <- f
+		}(nodeToSave, file)
 	}
 
-	// end of mutex area for clowders status lock
-	node.Pool().ClowdersStatusLock.Unlock()
+	// end of mutex area for nodes status lock
+	node.Pool().NodesStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
 }
@@ -148,7 +148,7 @@ func fileList(ctx echo.Context) error {
 
 	// sql error occurred
 	if sqlResult.Error != nil && !sqlResult.RecordNotFound() {
-		logger.File().Errorf("Error finding the clowder's file list in database, %s", sqlResult.Error.Error())
+		logger.File().Errorf("Error finding the node's file list in database, %s", sqlResult.Error.Error())
 		return ctx.NoContent(http.StatusInternalServerError)
 	}
 
@@ -159,14 +159,14 @@ func fileList(ctx echo.Context) error {
 File download requested by client(clowdee).
 */
 func download(ctx echo.Context) error {
-	clowdee := ctx.Get("clowdee").(*model.Clowdee)
-
-	// bind download list
-	downloadList := &[]*FileToDownload{}
-	if err := ctx.Bind(downloadList); err != nil {
-		logger.File().Infof("Error binding client's download list, %s", err)
-		return err
-	}
+	//clowdee := ctx.Get("clowdee").(*model.Clowdee)
+	//
+	//// bind download list
+	//downloadList := &[]*FileToDownload{}
+	//if err := ctx.Bind(downloadList); err != nil {
+	//	logger.File().Infof("Error binding client's download list, %s", err)
+	//	return err
+	//}
 
 	return nil
 }
