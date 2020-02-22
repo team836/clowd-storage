@@ -6,6 +6,11 @@ import (
 	"github.com/team836/clowd-storage/pkg/database"
 )
 
+type EncFile struct {
+	Model *File
+	Data  [][]byte
+}
+
 type File struct {
 	// column fields
 	ID         uint      `gorm:"type:int(11) unsigned auto_increment;primary_key"`

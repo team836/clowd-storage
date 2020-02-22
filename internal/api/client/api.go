@@ -72,7 +72,7 @@ func upload(ctx echo.Context) error {
 			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
-		encFile := &cwde.EncFile{
+		encFile := &model.EncFile{
 			Model: &model.File{
 				GoogleID: clowdee.GoogleID,
 				Name:     file.Name,

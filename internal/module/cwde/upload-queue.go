@@ -16,13 +16,8 @@ var (
 	ErrLackOfStorage = errors.New("cannot save the files because of lack of storage space")
 )
 
-type EncFile struct {
-	Model *model.File
-	Data  [][]byte
-}
-
 type UploadQueue struct {
-	files []*EncFile
+	files []*model.EncFile
 }
 
 func NewUQ() *UploadQueue {
@@ -33,7 +28,7 @@ func NewUQ() *UploadQueue {
 /**
 Push the encoded file to queue.
 */
-func (uq *UploadQueue) Push(file *EncFile) {
+func (uq *UploadQueue) Push(file *model.EncFile) {
 	uq.files = append(uq.files, file)
 }
 
