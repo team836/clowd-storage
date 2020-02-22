@@ -42,11 +42,6 @@ type Status struct {
 	isOld bool
 }
 
-type ShardOnNode struct {
-	Name string `json:"name"`
-	Data []byte `json:"data"`
-}
-
 type ActiveNode struct {
 	// corresponding node model
 	Model *model.Node
@@ -59,7 +54,7 @@ type ActiveNode struct {
 	Ping chan bool
 
 	// save shards on the node
-	Save chan []*ShardOnNode
+	Save chan []*model.ShardToSave
 
 	//// load shards from the node
 	//Load chan []*cwde.ShardToLoad
@@ -68,24 +63,15 @@ type ActiveNode struct {
 	conn *websocket.Conn
 }
 
-func NewShardOnNode(name string, data []byte) *ShardOnNode {
-	son := &ShardOnNode{
-		Name: name,
-		Data: data,
-	}
-
-	return son
-}
-
-func NewActiveNode(conn *websocket.Conn, model *model.Node) *ActiveNode {
+func NewActiveNode(conn *websocket.Conn, nodeModel *model.Node) *ActiveNode {
 	c := &ActiveNode{
-		Model: model,
+		Model: nodeModel,
 		Status: &Status{
 			lastCheckedAt: time.Now().Add(-24 * time.Hour),
 			isOld:         true,
 		},
 		Ping: make(chan bool, 1), // buffered channel for trying ping
-		Save: make(chan []*ShardOnNode),
+		Save: make(chan []*model.ShardToSave),
 		//Load: make(chan []*cwde.ShardToLoad),
 		conn: conn,
 	}

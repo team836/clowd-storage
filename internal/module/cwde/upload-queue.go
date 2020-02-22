@@ -44,7 +44,7 @@ And update metadata and predict nodes' status by scheduling results.
 This function change nodes' status. So you SHOULD use this function with
 the `NodesStatusLock` which is mutex for all nodes' status.
 */
-func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.ActiveNode][]*cwdr.ShardOnNode, error) {
+func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.ActiveNode][]*model.ShardToSave, error) {
 	// define constant for indicating current schedule phase
 	const (
 		PHASE1 = 1
@@ -57,7 +57,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Acti
 	uq.sort()
 
 	currRing := safeRing
-	quotas := make(map[*cwdr.ActiveNode][]*cwdr.ShardOnNode)
+	quotas := make(map[*cwdr.ActiveNode][]*model.ShardToSave)
 
 	// begin a transaction
 	tx := database.Conn().Begin()
@@ -123,7 +123,10 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Acti
 			// assignment shard to this node
 			quotas[currNode] = append(
 				quotas[currNode],
-				cwdr.NewShardOnNode(shardModel.Name, shard),
+				&model.ShardToSave{
+					Name: shardModel.Name,
+					Data: shard,
+				},
 			)
 
 			// node status prediction

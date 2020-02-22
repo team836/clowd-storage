@@ -8,6 +8,11 @@ import (
 	"github.com/team836/clowd-storage/pkg/database"
 )
 
+type ShardToSave struct {
+	Name string `json:"name"`
+	Data []byte `json:"data"`
+}
+
 type Shard struct {
 	// column fields
 	Name      string `gorm:"type:varchar(255);primary_key"`
