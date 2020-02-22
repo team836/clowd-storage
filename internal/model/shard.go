@@ -1,7 +1,8 @@
 package model
 
 import (
-	"encoding/base64"
+	"crypto/md5"
+	"encoding/hex"
 	"strconv"
 
 	"github.com/team836/clowd-storage/pkg/database"
@@ -42,5 +43,6 @@ func (shard *Shard) DecideName() {
 			strconv.Itoa(int(shard.FileID)),
 	)
 
-	shard.Name = base64.URLEncoding.EncodeToString(uniqueBytes)
+	hash := md5.Sum(uniqueBytes)
+	shard.Name = hex.EncodeToString(hash[:])
 }
