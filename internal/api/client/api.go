@@ -18,19 +18,19 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type FileOnClient struct {
+type fileOnClient struct {
 	Name  string `json:"name"`
 	Order int    `json:"order"`
 	Data  string `json:"data"` // base64 encoded
 }
 
-type FileView struct {
+type fileView struct {
 	Name       string    `json:"name"`
 	Size       uint      `json:"size"`
 	UploadedAt time.Time `json:"uploadedAt"`
 }
 
-type FileToDownload struct {
+type fileToDown struct {
 	Name string `json:"name"`
 }
 
@@ -54,8 +54,8 @@ File upload requested by client(clowdee).
 func upload(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
-	// bind uploaded data into array of `FileOnClient` struct
-	files := &[]*FileOnClient{}
+	// bind uploaded data into array of `fileOnClient` struct
+	files := &[]*fileOnClient{}
 	if err := ctx.Bind(files); err != nil {
 		logger.File().Infof("Error binding client's uploaded file, %s", err)
 		return err
@@ -138,7 +138,7 @@ Get clowdee's all uploaded file list.
 func fileList(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
-	fileList := &[]*FileView{}
+	fileList := &[]*fileView{}
 
 	// find from database
 	sqlResult := database.Conn().
@@ -164,7 +164,7 @@ func download(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind download list
-	downloadList := &[]*FileToDownload{}
+	downloadList := &[]*fileToDown{}
 	if err := ctx.Bind(downloadList); err != nil {
 		logger.File().Infof("Error binding client's download list, %s", err)
 		return err
