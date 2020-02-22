@@ -160,14 +160,30 @@ func fileList(ctx echo.Context) error {
 File download requested by client(clowdee).
 */
 func download(ctx echo.Context) error {
-	//clowdee := ctx.Get("clowdee").(*model.Clowdee)
-	//
-	//// bind download list
-	//downloadList := &[]*FileToDownload{}
-	//if err := ctx.Bind(downloadList); err != nil {
-	//	logger.File().Infof("Error binding client's download list, %s", err)
-	//	return err
-	//}
+	clowdee := ctx.Get("clowdee").(*model.Clowdee)
+
+	// bind download list
+	downloadList := &[]*FileToDownload{}
+	if err := ctx.Bind(downloadList); err != nil {
+		logger.File().Infof("Error binding client's download list, %s", err)
+		return err
+	}
+
+	dq := newDQ()
+
+	// read download list and add them to download queue
+	for _, file := range *downloadList {
+		fileModel := &model.File{
+			GoogleID: clowdee.GoogleID,
+			Name:     file.Name,
+		}
+
+		if err := dq.push(fileModel); err != nil {
+			if err == ErrFileNotExist {
+				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
+			}
+		}
+	}
 
 	return nil
 }
