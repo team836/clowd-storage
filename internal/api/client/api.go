@@ -30,8 +30,9 @@ type FileView struct {
 }
 
 func RegisterHandlers(group *echo.Group) {
-	group.GET("/files", fileList)
-	group.POST("/file", upload)
+	group.GET("/dir", fileList)
+	group.POST("/files", upload)
+	group.GET("/files", download)
 }
 
 /**
@@ -148,4 +149,8 @@ func fileList(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, fileList)
+}
+
+func download(ctx echo.Context) error {
+	return nil
 }
