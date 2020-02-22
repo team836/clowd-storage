@@ -11,6 +11,11 @@ type EncFile struct {
 	Data  [][]byte
 }
 
+type FileToLoad struct {
+	Model  *File
+	Shards []*ShardToLoad
+}
+
 type File struct {
 	// column fields
 	ID         uint      `gorm:"type:int(11) unsigned auto_increment;primary_key"`
