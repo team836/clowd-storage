@@ -13,6 +13,11 @@ type ShardToSave struct {
 	Data []byte `json:"data"`
 }
 
+type ShardToLoad struct {
+	Model *Shard
+	Data  []byte
+}
+
 type Shard struct {
 	// column fields
 	Name      string `gorm:"type:varchar(255);primary_key"`

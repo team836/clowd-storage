@@ -16,11 +16,6 @@ type DownloadQueue struct {
 	files []*model.File
 }
 
-type ShardToLoad struct {
-	model *model.Shard
-	data  []byte
-}
-
 func NewDQ() *DownloadQueue {
 	dq := &DownloadQueue{}
 	return dq
