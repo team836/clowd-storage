@@ -26,20 +26,15 @@ func RegisterHandlers(group *echo.Group) {
 }
 
 /**
-Handle the websocket requests from the clowder.
+Handle the websocket requests from the node.
 */
 func openWebsocket(ctx echo.Context) error {
-	clowderModel := ctx.Get("clowder").(*model.Clowder) // get current clowder model
+	nodeModel := ctx.Get("node").(*model.Node) // get current node model
 
-	machineID := ctx.QueryParam("mid") // get clowder machine id
-	if machineID == "" {
-		return ctx.String(http.StatusBadRequest, "Cannot find the machine id at the query parameters")
-	}
-
-	// find duplicate clowder connection and unregistered old one
-	for clowder := range Pool().clowders {
-		if clowder.machineID == machineID {
-			Pool().unregister <- clowder
+	// find duplicate node connection and unregistered old one
+	for node := range Pool().nodes {
+		if node.Model.MachineID == nodeModel.MachineID {
+			Pool().unregister <- node
 			break
 		}
 	}
@@ -51,11 +46,11 @@ func openWebsocket(ctx echo.Context) error {
 		return err
 	}
 
-	// create new clowder
-	clowder := NewClowder(machineID, conn, clowderModel)
+	// create new node
+	node := NewNode(conn, nodeModel)
 
-	go clowder.run()           // run the websocket operations
-	Pool().register <- clowder // register this clowder to pool
+	go node.run()           // run the websocket operations
+	Pool().register <- node // register this node to pool
 
 	return nil
 }
