@@ -54,3 +54,28 @@ func (dq *DownloadQueue) push(fileToLoad *model.File) error {
 
 	return nil
 }
+
+/**
+Assign shards for download to the each nodes
+which are identified by machine id.
+*/
+func (dq *DownloadQueue) schedule() map[string][]*ShardToLoad {
+	quotas := make(map[string][]*ShardToLoad)
+
+	// for every files to download
+	for _, file := range dq.files {
+		// for every shards of the file
+		for _, shard := range file.Shards {
+			shard := shard // pin (See the scopelint document)
+
+			quotas[shard.MachineID] = append(
+				quotas[shard.MachineID],
+				&ShardToLoad{
+					model: &shard,
+				},
+			)
+		}
+	}
+
+	return quotas
+}

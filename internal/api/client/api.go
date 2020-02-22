@@ -185,5 +185,8 @@ func download(ctx echo.Context) error {
 		}
 	}
 
+	// schedule every shards for download to the each nodes
+	quotas := dq.schedule()
+
 	return nil
 }
