@@ -44,7 +44,7 @@ And update metadata and predict nodes' status by scheduling results.
 This function change nodes' status. So you SHOULD use this function with
 the `NodesStatusLock` which is mutex for all nodes' status.
 */
-func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Node][]*cwdr.ShardOnNode, error) {
+func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.ActiveNode][]*cwdr.ShardOnNode, error) {
 	// define constant for indicating current schedule phase
 	const (
 		PHASE1 = 1
@@ -57,7 +57,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Node
 	uq.sort()
 
 	currRing := safeRing
-	quotas := make(map[*cwdr.Node][]*cwdr.ShardOnNode)
+	quotas := make(map[*cwdr.ActiveNode][]*cwdr.ShardOnNode)
 
 	// begin a transaction
 	tx := database.Conn().Begin()
@@ -85,7 +85,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Node
 		for pos, shard := range file.Data {
 			tolerance := 0
 			// find the node which can store this shard
-			for currRing.Value.(*cwdr.Node).Status.Capacity < uint64(len(shard)) {
+			for currRing.Value.(*cwdr.ActiveNode).Status.Capacity < uint64(len(shard)) {
 				currRing = currRing.Next()
 
 				tolerance++
@@ -105,7 +105,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Node
 			}
 
 			// set current node
-			currNode := currRing.Value.(*cwdr.Node)
+			currNode := currRing.Value.(*cwdr.ActiveNode)
 
 			// create the shard record
 			shardModel := &model.Shard{

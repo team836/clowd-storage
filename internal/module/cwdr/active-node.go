@@ -47,7 +47,7 @@ type ShardOnNode struct {
 	Data []byte `json:"data"`
 }
 
-type Node struct {
+type ActiveNode struct {
 	// corresponding node model
 	Model *model.Node
 
@@ -77,8 +77,8 @@ func NewShardOnNode(name string, data []byte) *ShardOnNode {
 	return son
 }
 
-func NewNode(conn *websocket.Conn, model *model.Node) *Node {
-	c := &Node{
+func NewActiveNode(conn *websocket.Conn, model *model.Node) *ActiveNode {
+	c := &ActiveNode{
 		Model: model,
 		Status: &Status{
 			lastCheckedAt: time.Now().Add(-24 * time.Hour),
@@ -96,7 +96,7 @@ func NewNode(conn *websocket.Conn, model *model.Node) *Node {
 /**
 Run the websocket operations using non-blocking channels.
 */
-func (node *Node) Run() {
+func (node *ActiveNode) Run() {
 	defer func() {
 		Pool().Unregister <- node
 	}()

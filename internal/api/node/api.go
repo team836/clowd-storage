@@ -49,7 +49,7 @@ func openWebsocket(ctx echo.Context) error {
 	}
 
 	// create new node
-	node := cwdr.NewNode(conn, nodeModel)
+	node := cwdr.NewActiveNode(conn, nodeModel)
 
 	go node.Run()                // run the websocket operations
 	cwdr.Pool().Register <- node // register this node to pool

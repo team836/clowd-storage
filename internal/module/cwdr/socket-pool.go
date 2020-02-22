@@ -23,13 +23,13 @@ type SocketPool struct {
 	pingWaitGroup sync.WaitGroup
 
 	// registered nodes
-	Nodes map[*Node]bool
+	Nodes map[*ActiveNode]bool
 
 	// register requests from the node
-	Register chan *Node
+	Register chan *ActiveNode
 
 	// unregister requests from the node
-	Unregister chan *Node
+	Unregister chan *ActiveNode
 }
 
 /**
@@ -48,9 +48,9 @@ Create new socket pool.
 */
 func newSocketPool() *SocketPool {
 	pool := &SocketPool{
-		Nodes:      make(map[*Node]bool),
-		Register:   make(chan *Node),
-		Unregister: make(chan *Node),
+		Nodes:      make(map[*ActiveNode]bool),
+		Register:   make(chan *ActiveNode),
+		Unregister: make(chan *ActiveNode),
 	}
 
 	// Run the pool operations concurrently
@@ -111,8 +111,8 @@ This function read nodes' status at specific time. So you SHOULD use this functi
 the `NodesStatusLock` which is mutex for all nodes' status.
 */
 func (pool *SocketPool) SelectNodes() (*ring.Ring, *ring.Ring) {
-	safeNodes := make(map[*Node]bool)
-	unsafeNodes := make(map[*Node]bool)
+	safeNodes := make(map[*ActiveNode]bool)
+	unsafeNodes := make(map[*ActiveNode]bool)
 
 	// separate node list by whether status is old or not
 	for node := range pool.Nodes {
@@ -149,7 +149,7 @@ func (pool *SocketPool) run() {
 /**
 Convert map to ring.
 */
-func mapToRing(m map[*Node]bool) *ring.Ring {
+func mapToRing(m map[*ActiveNode]bool) *ring.Ring {
 	r := ring.New(len(m))
 	for key := range m {
 		r.Value = key
