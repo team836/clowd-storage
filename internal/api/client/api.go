@@ -61,7 +61,7 @@ func upload(ctx echo.Context) error {
 	}
 
 	// create upload queue
-	uq := newUQ(clowdee)
+	uq := newUQ()
 
 	// encode every file data using reed solomon algorithm
 	for _, file := range *files {
@@ -72,10 +72,11 @@ func upload(ctx echo.Context) error {
 		}
 
 		encFile := &EncFile{
-			header: &FileHeader{
-				name:  file.Name,
-				order: file.Order,
-				size:  uint(len(file.Data)),
+			model: &model.File{
+				GoogleID: clowdee.GoogleID,
+				Name:     file.Name,
+				Position: int16(file.Order),
+				Size:     uint(len(file.Data)),
 			},
 			data: shards,
 		}

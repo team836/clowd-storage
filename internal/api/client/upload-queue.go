@@ -18,24 +18,17 @@ var (
 	ErrLackOfStorage = errors.New("cannot save the files because of lack of storage space")
 )
 
-type FileHeader struct {
-	name  string
-	order int
-	size  uint
-}
-
 type EncFile struct {
-	header *FileHeader
-	data   [][]byte
+	model *model.File
+	data  [][]byte
 }
 
 type UploadQueue struct {
-	clowdee *model.Clowdee
-	files   []*EncFile
+	files []*EncFile
 }
 
-func newUQ(clowdee *model.Clowdee) *UploadQueue {
-	uq := &UploadQueue{clowdee: clowdee}
+func newUQ() *UploadQueue {
+	uq := &UploadQueue{}
 	return uq
 }
 
@@ -94,13 +87,7 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 	// for every files to save
 	for _, file := range uq.files {
 		// create the file record
-		fileModel := &model.File{
-			GoogleID: uq.clowdee.GoogleID,
-			Name:     file.header.name,
-			Position: int16(file.header.order),
-			Size:     file.header.size,
-		}
-		if err := tx.Create(fileModel).Error; err != nil {
+		if err := tx.Create(file.model).Error; err != nil {
 			tx.Rollback()
 			return nil, err
 		}
@@ -134,7 +121,7 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 			// create the shard record
 			shardModel := &model.Shard{
 				Position:  uint8(pos),
-				FileID:    fileModel.ID,
+				FileID:    file.model.ID,
 				MachineID: currNode.Model.MachineID,
 				Checksum:  checksum(shard),
 			}
