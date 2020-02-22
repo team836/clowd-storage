@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/team836/clowd-storage/internal/module/cwde"
+	"github.com/team836/clowd-storage/internal/module/cwdr"
+
 	"github.com/team836/clowd-storage/pkg/database"
 
 	"github.com/team836/clowd-storage/internal/model"
@@ -11,8 +14,6 @@ import (
 	"github.com/team836/clowd-storage/pkg/errcorr"
 
 	"github.com/team836/clowd-storage/pkg/logger"
-
-	"github.com/team836/clowd-storage/internal/api/node"
 
 	"github.com/labstack/echo/v4"
 )
@@ -61,7 +62,7 @@ func upload(ctx echo.Context) error {
 	}
 
 	// create upload queue
-	uq := newUQ()
+	uq := cwde.NewUQ()
 
 	// encode every file data using reed solomon algorithm
 	for _, file := range *files {
@@ -71,47 +72,47 @@ func upload(ctx echo.Context) error {
 			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
-		encFile := &EncFile{
-			model: &model.File{
+		encFile := &cwde.EncFile{
+			Model: &model.File{
 				GoogleID: clowdee.GoogleID,
 				Name:     file.Name,
 				Position: int16(file.Order),
 				Size:     uint(len(file.Data)),
 			},
-			data: shards,
+			Data: shards,
 		}
-		uq.push(encFile)
+		uq.Push(encFile)
 	}
 
 	// this area almost change all nodes' status
 	// so, protect it using mutex for all node's status
-	node.Pool().NodesStatusLock.Lock()
+	cwdr.Pool().NodesStatusLock.Lock()
 	defer func() {
 		// when panic is occurred, unlock the nodes status lock
 		if r := recover(); r != nil {
-			node.Pool().NodesStatusLock.Unlock()
+			cwdr.Pool().NodesStatusLock.Unlock()
 		}
 	}()
 
 	// check all nodes' status by ping&pong
-	node.Pool().CheckAllNodes()
+	cwdr.Pool().CheckAllNodes()
 
 	// node selection
-	safeRing, unsafeRing := node.Pool().SelectNodes()
+	safeRing, unsafeRing := cwdr.Pool().SelectNodes()
 	if safeRing.Len()+unsafeRing.Len() == 0 {
-		node.Pool().NodesStatusLock.Unlock()
+		cwdr.Pool().NodesStatusLock.Unlock()
 		logger.File().Errorf("Available nodes are not exist.")
 		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available nodes")
 	}
 
 	// schedule saving for every shards to the nodes
 	// and get results
-	quotas, err := uq.schedule(safeRing, unsafeRing)
+	quotas, err := uq.Schedule(safeRing, unsafeRing)
 	if err != nil {
-		node.Pool().NodesStatusLock.Unlock()
+		cwdr.Pool().NodesStatusLock.Unlock()
 		logger.File().Errorf("Error scheduling upload, %s", err)
 
-		if err == ErrLackOfStorage {
+		if err == cwde.ErrLackOfStorage {
 			return ctx.String(http.StatusNotAcceptable, err.Error())
 		}
 
@@ -120,13 +121,13 @@ func upload(ctx echo.Context) error {
 
 	// save each quota using goroutine
 	for nodeToSave, shards := range quotas {
-		go func(n *node.Node, s []*node.ShardOnNode) {
+		go func(n *cwdr.Node, s []*cwdr.ShardOnNode) {
 			n.Save <- s
 		}(nodeToSave, shards)
 	}
 
 	// end of mutex area for nodes status lock
-	node.Pool().NodesStatusLock.Unlock()
+	cwdr.Pool().NodesStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
 }
@@ -169,7 +170,7 @@ func download(ctx echo.Context) error {
 		return err
 	}
 
-	dq := newDQ()
+	dq := cwde.NewDQ()
 
 	// read download list and add them to download queue
 	for _, file := range *downloadList {
@@ -178,20 +179,20 @@ func download(ctx echo.Context) error {
 			Name:     file.Name,
 		}
 
-		if err := dq.push(fileModel); err != nil {
-			if err == ErrFileNotExist {
+		if err := dq.Push(fileModel); err != nil {
+			if err == cwde.ErrFileNotExist {
 				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
 			}
 		}
 	}
 
-	// schedule every shards for download to the each nodes
-	quotas := dq.schedule()
-
-	// download each quota using goroutine
-	for machineID, shards := range quotas {
-
-	}
+	//// schedule every shards for download to the each nodes
+	//quotas := dq.Schedule()
+	//
+	//// download each quota using goroutine
+	//for machineID, shards := range quotas {
+	//
+	//}
 
 	return nil
 }

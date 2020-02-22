@@ -1,4 +1,4 @@
-package node
+package cwdr
 
 import (
 	"time"
@@ -18,6 +18,10 @@ const (
 	maxPongSize = 512
 
 	saveWait = 30 * time.Second
+
+	//loadWait = 30 * time.Second
+	//
+	//maxLoadSize = 1048576
 )
 
 type Status struct {
@@ -57,6 +61,9 @@ type Node struct {
 	// save shards on the node
 	Save chan []*ShardOnNode
 
+	//// load shards from the node
+	//Load chan []*cwde.ShardToLoad
+
 	// websocket connection
 	conn *websocket.Conn
 }
@@ -79,6 +86,7 @@ func NewNode(conn *websocket.Conn, model *model.Node) *Node {
 		},
 		Ping: make(chan bool, 1), // buffered channel for trying ping
 		Save: make(chan []*ShardOnNode),
+		//Load: make(chan []*cwde.ShardToLoad),
 		conn: conn,
 	}
 
@@ -88,9 +96,9 @@ func NewNode(conn *websocket.Conn, model *model.Node) *Node {
 /**
 Run the websocket operations using non-blocking channels.
 */
-func (node *Node) run() {
+func (node *Node) Run() {
 	defer func() {
-		pool.unregister <- node
+		Pool().Unregister <- node
 	}()
 
 	for {
@@ -102,7 +110,7 @@ func (node *Node) run() {
 			_ = node.conn.SetWriteDeadline(time.Now().Add(pingWait))
 			if err := node.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				logger.File().Infof("Error sending ping to node, %s", err)
-				pool.pingWaitGroup.Done()
+				Pool().pingWaitGroup.Done()
 				return
 			}
 
@@ -110,7 +118,7 @@ func (node *Node) run() {
 			_ = node.conn.SetReadDeadline(time.Now().Add(pongWait))
 			if err := node.conn.ReadJSON(node.Status); err != nil {
 				logger.File().Infof("Error receiving pong data from node, %s", err)
-				pool.pingWaitGroup.Done()
+				Pool().pingWaitGroup.Done()
 				return
 			}
 
@@ -118,7 +126,7 @@ func (node *Node) run() {
 
 			node.Status.lastCheckedAt = time.Now() // update last ping time
 			node.Status.isOld = false
-			pool.pingWaitGroup.Done()
+			Pool().pingWaitGroup.Done()
 		case shards := <-node.Save:
 			_ = node.conn.SetWriteDeadline(time.Now().Add(saveWait))
 			// byte array data are send as base64 encoded format

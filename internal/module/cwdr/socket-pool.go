@@ -1,4 +1,4 @@
-package node
+package cwdr
 
 import (
 	"container/ring"
@@ -23,13 +23,13 @@ type SocketPool struct {
 	pingWaitGroup sync.WaitGroup
 
 	// registered nodes
-	nodes map[*Node]bool
+	Nodes map[*Node]bool
 
 	// register requests from the node
-	register chan *Node
+	Register chan *Node
 
 	// unregister requests from the node
-	unregister chan *Node
+	Unregister chan *Node
 }
 
 /**
@@ -48,12 +48,12 @@ Create new socket pool.
 */
 func newSocketPool() *SocketPool {
 	pool := &SocketPool{
-		nodes:      make(map[*Node]bool),
-		register:   make(chan *Node),
-		unregister: make(chan *Node),
+		Nodes:      make(map[*Node]bool),
+		Register:   make(chan *Node),
+		Unregister: make(chan *Node),
 	}
 
-	// run the pool operations concurrently
+	// Run the pool operations concurrently
 	go pool.run()
 
 	return pool
@@ -61,7 +61,7 @@ func newSocketPool() *SocketPool {
 
 func (pool *SocketPool) TotalCapacity() uint64 {
 	var cap uint64 = 0
-	for node := range pool.nodes {
+	for node := range pool.Nodes {
 		cap += node.Status.Capacity
 	}
 
@@ -77,7 +77,7 @@ the `NodesStatusLock` which is mutex for all nodes' status.
 */
 func (pool *SocketPool) CheckAllNodes() {
 	now := time.Now()
-	for node := range pool.nodes {
+	for node := range pool.Nodes {
 		// check whether if the node's current status is old
 		if now.After(node.Status.lastCheckedAt.Add(pingCoolTime)) {
 			pool.pingWaitGroup.Add(1)
@@ -115,7 +115,7 @@ func (pool *SocketPool) SelectNodes() (*ring.Ring, *ring.Ring) {
 	unsafeNodes := make(map[*Node]bool)
 
 	// separate node list by whether status is old or not
-	for node := range pool.nodes {
+	for node := range pool.Nodes {
 		if node.Status.isOld {
 			unsafeNodes[node] = true
 		} else {
@@ -137,11 +137,11 @@ unregister: unregister the node from pool
 func (pool *SocketPool) run() {
 	for {
 		select {
-		case node := <-pool.register:
-			pool.nodes[node] = true
-		case node := <-pool.unregister:
+		case node := <-pool.Register:
+			pool.Nodes[node] = true
+		case node := <-pool.Unregister:
 			_ = node.conn.Close()
-			delete(pool.nodes, node)
+			delete(pool.Nodes, node)
 		}
 	}
 }

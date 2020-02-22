@@ -1,17 +1,15 @@
-package client
+package cwde
 
 import (
 	"container/ring"
 	"errors"
 	"sort"
 
+	"github.com/team836/clowd-storage/internal/module/cwdr"
+	"github.com/team836/clowd-storage/pkg/database"
 	"github.com/team836/clowd-storage/pkg/errcorr"
 
-	"github.com/team836/clowd-storage/pkg/database"
-
 	"github.com/team836/clowd-storage/internal/model"
-
-	"github.com/team836/clowd-storage/internal/api/node"
 )
 
 var (
@@ -19,15 +17,15 @@ var (
 )
 
 type EncFile struct {
-	model *model.File
-	data  [][]byte
+	Model *model.File
+	Data  [][]byte
 }
 
 type UploadQueue struct {
 	files []*EncFile
 }
 
-func newUQ() *UploadQueue {
+func NewUQ() *UploadQueue {
 	uq := &UploadQueue{}
 	return uq
 }
@@ -35,17 +33,8 @@ func newUQ() *UploadQueue {
 /**
 Push the encoded file to queue.
 */
-func (uq *UploadQueue) push(file *EncFile) {
+func (uq *UploadQueue) Push(file *EncFile) {
 	uq.files = append(uq.files, file)
-}
-
-/**
-Sort the files by shard size in descending order.
-*/
-func (uq *UploadQueue) sort() {
-	sort.Slice(uq.files, func(i, j int) bool {
-		return len(uq.files[i].data[0]) > len(uq.files[j].data[0])
-	})
 }
 
 /**
@@ -55,7 +44,7 @@ And update metadata and predict nodes' status by scheduling results.
 This function change nodes' status. So you SHOULD use this function with
 the `NodesStatusLock` which is mutex for all nodes' status.
 */
-func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node][]*node.ShardOnNode, error) {
+func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Node][]*cwdr.ShardOnNode, error) {
 	// define constant for indicating current schedule phase
 	const (
 		PHASE1 = 1
@@ -68,7 +57,7 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 	uq.sort()
 
 	currRing := safeRing
-	quotas := make(map[*node.Node][]*node.ShardOnNode)
+	quotas := make(map[*cwdr.Node][]*cwdr.ShardOnNode)
 
 	// begin a transaction
 	tx := database.Conn().Begin()
@@ -87,16 +76,16 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 	// for every files to save
 	for _, file := range uq.files {
 		// create the file record
-		if err := tx.Create(file.model).Error; err != nil {
+		if err := tx.Create(file.Model).Error; err != nil {
 			tx.Rollback()
 			return nil, err
 		}
 
 		// for every shards
-		for pos, shard := range file.data {
+		for pos, shard := range file.Data {
 			tolerance := 0
 			// find the node which can store this shard
-			for currRing.Value.(*node.Node).Status.Capacity < uint64(len(shard)) {
+			for currRing.Value.(*cwdr.Node).Status.Capacity < uint64(len(shard)) {
 				currRing = currRing.Next()
 
 				tolerance++
@@ -116,12 +105,12 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 			}
 
 			// set current node
-			currNode := currRing.Value.(*node.Node)
+			currNode := currRing.Value.(*cwdr.Node)
 
 			// create the shard record
 			shardModel := &model.Shard{
 				Position:  uint8(pos),
-				FileID:    file.model.ID,
+				FileID:    file.Model.ID,
 				MachineID: currNode.Model.MachineID,
 				Checksum:  errcorr.Checksum(shard),
 			}
@@ -134,7 +123,7 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 			// assignment shard to this node
 			quotas[currNode] = append(
 				quotas[currNode],
-				node.NewShardOnNode(shardModel.Name, shard),
+				cwdr.NewShardOnNode(shardModel.Name, shard),
 			)
 
 			// node status prediction
@@ -148,4 +137,13 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 	tx.Commit()
 
 	return quotas, nil
+}
+
+/**
+Sort the files by shard size in descending order.
+*/
+func (uq *UploadQueue) sort() {
+	sort.Slice(uq.files, func(i, j int) bool {
+		return len(uq.files[i].Data[0]) > len(uq.files[j].Data[0])
+	})
 }

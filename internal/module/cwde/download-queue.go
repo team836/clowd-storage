@@ -1,4 +1,4 @@
-package client
+package cwde
 
 import (
 	"errors"
@@ -21,7 +21,7 @@ type ShardToLoad struct {
 	data  []byte
 }
 
-func newDQ() *DownloadQueue {
+func NewDQ() *DownloadQueue {
 	dq := &DownloadQueue{}
 	return dq
 }
@@ -29,7 +29,7 @@ func newDQ() *DownloadQueue {
 /**
 Push the list of file to load by querying database.
 */
-func (dq *DownloadQueue) push(fileToLoad *model.File) error {
+func (dq *DownloadQueue) Push(fileToLoad *model.File) error {
 	fileModels := &[]*model.File{}
 
 	// find all segments of the file
@@ -59,7 +59,7 @@ func (dq *DownloadQueue) push(fileToLoad *model.File) error {
 Assign shards for download to the each nodes
 which are identified by machine id.
 */
-func (dq *DownloadQueue) schedule() map[string][]*ShardToLoad {
+func (dq *DownloadQueue) Schedule() map[string][]*ShardToLoad {
 	quotas := make(map[string][]*ShardToLoad)
 
 	// for every files to download
