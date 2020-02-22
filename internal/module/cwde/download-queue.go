@@ -13,7 +13,7 @@ var (
 )
 
 type DownloadQueue struct {
-	files []*model.File
+	files []*model.FileToLoad
 }
 
 func NewDQ() *DownloadQueue {
@@ -24,14 +24,13 @@ func NewDQ() *DownloadQueue {
 /**
 Push the list of file to load by querying database.
 */
-func (dq *DownloadQueue) Push(fileToLoad *model.File) error {
+func (dq *DownloadQueue) Push(googleID string, fileName string) error {
 	fileModels := &[]*model.File{}
 
-	// find all segments of the file
-	// and preload its corresponding shards
+	// find all segments of the file using google id and name
 	sqlResult := database.Conn().
-		Where(fileToLoad).
-		Preload("Shards").Find(fileModels)
+		Where(&model.File{GoogleID: googleID, Name: fileName}).
+		Find(fileModels)
 
 	if sqlResult.Error != nil {
 		// if the file is not exist in the record
@@ -44,8 +43,36 @@ func (dq *DownloadQueue) Push(fileToLoad *model.File) error {
 		return sqlResult.Error
 	}
 
-	// append to download queue
-	dq.files = append(dq.files, *fileModels...)
+	// for every file records(segments)
+	for _, fileModel := range *fileModels {
+		fileToLoad := &model.FileToLoad{Model: fileModel}
+
+		// find all shards of the segment which are ordered by its position
+		shardModels := &[]*model.Shard{}
+		sqlResult := database.Conn().
+			Where("file_id = ?", fileModel.ID).
+			Order("position asc").
+			Find(shardModels)
+
+		if sqlResult.Error != nil {
+			// if the shard which is corresponding to the file is not exist in the record
+			if sqlResult.RecordNotFound() {
+				return ErrFileNotExist
+			}
+
+			// other sql error
+			logger.File().Errorf("Error finding the shard in database, %s", sqlResult.Error.Error())
+			return sqlResult.Error
+		}
+
+		// for every shards
+		for _, shardModel := range *shardModels {
+			shardToLoad := &model.ShardToLoad{Model: shardModel}
+			fileToLoad.Shards = append(fileToLoad.Shards, shardToLoad)
+		}
+
+		dq.files = append(dq.files, fileToLoad)
+	}
 
 	return nil
 }
@@ -54,20 +81,16 @@ func (dq *DownloadQueue) Push(fileToLoad *model.File) error {
 Assign shards for download to the each nodes
 which are identified by machine id.
 */
-func (dq *DownloadQueue) Schedule() map[string][]*ShardToLoad {
-	quotas := make(map[string][]*ShardToLoad)
+func (dq *DownloadQueue) Schedule() map[string][]*model.ShardToLoad {
+	quotas := make(map[string][]*model.ShardToLoad)
 
 	// for every files to download
 	for _, file := range dq.files {
 		// for every shards of the file
 		for _, shard := range file.Shards {
-			shard := shard // pin (See the scopelint document)
-
-			quotas[shard.MachineID] = append(
-				quotas[shard.MachineID],
-				&ShardToLoad{
-					model: &shard,
-				},
+			quotas[shard.Model.MachineID] = append(
+				quotas[shard.Model.MachineID],
+				shard,
 			)
 		}
 	}

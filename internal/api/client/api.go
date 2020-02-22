@@ -174,12 +174,7 @@ func download(ctx echo.Context) error {
 
 	// read download list and add them to download queue
 	for _, file := range *downloadList {
-		fileModel := &model.File{
-			GoogleID: clowdee.GoogleID,
-			Name:     file.Name,
-		}
-
-		if err := dq.Push(fileModel); err != nil {
+		if err := dq.Push(clowdee.GoogleID, file.Name); err != nil {
 			if err == cwde.ErrFileNotExist {
 				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
 			}
