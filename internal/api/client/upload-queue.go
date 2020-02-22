@@ -2,10 +2,10 @@ package client
 
 import (
 	"container/ring"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"sort"
+
+	"github.com/team836/clowd-storage/pkg/errcorr"
 
 	"github.com/team836/clowd-storage/pkg/database"
 
@@ -123,7 +123,7 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 				Position:  uint8(pos),
 				FileID:    file.model.ID,
 				MachineID: currNode.Model.MachineID,
-				Checksum:  checksum(shard),
+				Checksum:  errcorr.Checksum(shard),
 			}
 			shardModel.DecideName()
 			if err := tx.Create(shardModel).Error; err != nil {
@@ -148,13 +148,4 @@ func (uq *UploadQueue) schedule(safeRing, unsafeRing *ring.Ring) (map[*node.Node
 	tx.Commit()
 
 	return quotas, nil
-}
-
-/**
-Generate sha256 checksum about the shard.
-*/
-func checksum(data []byte) string {
-	hash := sha256.Sum256(data)
-
-	return hex.EncodeToString(hash[:])
 }
