@@ -38,7 +38,7 @@ type Status struct {
 	isOld bool
 }
 
-type FileOnNode struct {
+type ShardOnNode struct {
 	Name string `json:"name"`
 	Data []byte `json:"data"`
 }
@@ -54,20 +54,20 @@ type Node struct {
 	// It SHOULD be buffered channel for non-blocking at the socket pool
 	Ping chan bool
 
-	// save file on the node
-	SaveFile chan []*FileOnNode
+	// save shards on the node
+	Save chan []*ShardOnNode
 
 	// websocket connection
 	conn *websocket.Conn
 }
 
-func NewFileOnNode(name string, data []byte) *FileOnNode {
-	fon := &FileOnNode{
+func NewShardOnNode(name string, data []byte) *ShardOnNode {
+	son := &ShardOnNode{
 		Name: name,
 		Data: data,
 	}
 
-	return fon
+	return son
 }
 
 func NewNode(conn *websocket.Conn, model *model.Node) *Node {
@@ -77,9 +77,9 @@ func NewNode(conn *websocket.Conn, model *model.Node) *Node {
 			lastCheckedAt: time.Now().Add(-24 * time.Hour),
 			isOld:         true,
 		},
-		Ping:     make(chan bool, 1), // buffered channel for trying ping
-		SaveFile: make(chan []*FileOnNode),
-		conn:     conn,
+		Ping: make(chan bool, 1), // buffered channel for trying ping
+		Save: make(chan []*ShardOnNode),
+		conn: conn,
 	}
 
 	return c
@@ -119,10 +119,10 @@ func (node *Node) run() {
 			node.Status.lastCheckedAt = time.Now() // update last ping time
 			node.Status.isOld = false
 			pool.pingWaitGroup.Done()
-		case files := <-node.SaveFile:
+		case shards := <-node.Save:
 			_ = node.conn.SetWriteDeadline(time.Now().Add(saveWait))
 			// byte array data are send as base64 encoded format
-			if err := node.conn.WriteJSON(files); err != nil {
+			if err := node.conn.WriteJSON(shards); err != nil {
 				logger.File().Errorf("Error saving file to node, %s", err)
 				return
 			}

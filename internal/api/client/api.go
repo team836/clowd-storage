@@ -119,10 +119,10 @@ func upload(ctx echo.Context) error {
 	}
 
 	// save each quota using goroutine
-	for nodeToSave, file := range quotas {
-		go func(n *node.Node, f []*node.FileOnNode) {
-			n.SaveFile <- f
-		}(nodeToSave, file)
+	for nodeToSave, shards := range quotas {
+		go func(n *node.Node, s []*node.ShardOnNode) {
+			n.Save <- s
+		}(nodeToSave, shards)
 	}
 
 	// end of mutex area for nodes status lock
@@ -187,6 +187,11 @@ func download(ctx echo.Context) error {
 
 	// schedule every shards for download to the each nodes
 	quotas := dq.schedule()
+
+	// download each quota using goroutine
+	for machineID, shards := range quotas {
+
+	}
 
 	return nil
 }
