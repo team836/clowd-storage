@@ -2,9 +2,7 @@ package errcorr
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 
 	"github.com/klauspost/reedsolomon"
 )
@@ -68,13 +66,4 @@ func Decode(shards [][]byte, dataSize int) (string, error) {
 	data := base64.StdEncoding.EncodeToString(buf.Bytes())
 
 	return data, nil
-}
-
-/**
-Generate sha256 checksum about the shard.
-*/
-func Checksum(data []byte) string {
-	hash := sha256.Sum256(data)
-
-	return hex.EncodeToString(hash[:])
 }
