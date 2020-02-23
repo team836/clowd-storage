@@ -69,6 +69,19 @@ func (pool *SocketPool) TotalCapacity() uint64 {
 }
 
 /**
+Find active node in the pool by machine id.
+*/
+func (pool *SocketPool) FindActiveNode(machineID string) *ActiveNode {
+	for node := range pool.Nodes {
+		if node.Model.MachineID == machineID {
+			return node
+		}
+	}
+
+	return nil
+}
+
+/**
 Send ping concurrently to nodes whose current status is old
 and wait for all pong response.
 
