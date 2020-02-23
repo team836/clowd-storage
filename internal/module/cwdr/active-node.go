@@ -1,6 +1,7 @@
 package cwdr
 
 import (
+	"sync"
 	"time"
 
 	"github.com/team836/clowd-storage/internal/model"
@@ -28,6 +29,11 @@ const (
 
 type shardToDown struct {
 	Name string `json:"name"`
+}
+
+type LoadChan struct {
+	Shards []*model.ShardToLoad
+	WG     *sync.WaitGroup
 }
 
 type Status struct {
@@ -63,7 +69,7 @@ type ActiveNode struct {
 	Save chan []*model.ShardToSave
 
 	// load shards from the node
-	Load chan []*model.ShardToLoad
+	Load chan *LoadChan
 
 	// websocket connection
 	conn *websocket.Conn
@@ -78,7 +84,7 @@ func NewActiveNode(conn *websocket.Conn, nodeModel *model.Node) *ActiveNode {
 		},
 		Ping: make(chan bool, 1), // buffered channel for trying ping
 		Save: make(chan []*model.ShardToSave),
-		Load: make(chan []*model.ShardToLoad),
+		Load: make(chan *LoadChan),
 		conn: conn,
 	}
 
@@ -126,12 +132,12 @@ func (node *ActiveNode) Run() {
 				logger.File().Errorf("Error saving file to node, %s", err)
 				return
 			}
-		case shards := <-node.Load:
+		case loadChan := <-node.Load:
 			node.conn.SetReadLimit(maxLoadSize)
 
 			// make download list
 			shardsToDown := &[]*shardToDown{}
-			for _, shard := range shards {
+			for _, shard := range loadChan.Shards {
 				*shardsToDown = append(
 					*shardsToDown,
 					&shardToDown{Name: shard.Model.Name},
@@ -142,6 +148,7 @@ func (node *ActiveNode) Run() {
 			_ = node.conn.SetWriteDeadline(time.Now().Add(msgWait))
 			if err := node.conn.WriteJSON(*shardsToDown); err != nil {
 				logger.File().Infof("Error sending download list to node, %s", err)
+				loadChan.WG.Done()
 				return
 			}
 
@@ -151,25 +158,30 @@ func (node *ActiveNode) Run() {
 			_ = node.conn.SetReadDeadline(time.Now().Add(loadWait))
 			if err := node.conn.ReadJSON(*receivedShards); err != nil {
 				logger.File().Infof("Error downloading data from node, %s", err)
+				loadChan.WG.Done()
 				return
 			}
 
 			// if count of shards is different
-			if len(shards) != len(*receivedShards) {
+			if len(loadChan.Shards) != len(*receivedShards) {
 				logger.File().Infof("Count of shards is different, maybe malformed data")
+				loadChan.WG.Done()
 				return
 			}
 
 			// copy shard data
 			for idx, receivedShard := range *receivedShards {
 				// check if whether received data name is same
-				if shards[idx].Model.Name != receivedShard.Name {
+				if loadChan.Shards[idx].Model.Name != receivedShard.Name {
 					logger.File().Infof("Shard name is different, maybe malformed data")
+					loadChan.WG.Done()
 					return
 				}
 
-				shards[idx].Data = receivedShard.Data
+				loadChan.Shards[idx].Data = receivedShard.Data
 			}
+
+			loadChan.WG.Done()
 		}
 	}
 }
