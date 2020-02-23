@@ -121,8 +121,8 @@ func upload(ctx echo.Context) error {
 
 	// save each quota using goroutine
 	for nodeToSave, shards := range quotas {
-		go func(n *cwdr.ActiveNode, s []*model.ShardToSave) {
-			n.Save <- s
+		go func(a *cwdr.ActiveNode, s []*model.ShardToSave) {
+			a.Save <- s
 		}(nodeToSave, shards)
 	}
 
