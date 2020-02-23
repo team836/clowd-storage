@@ -9,7 +9,7 @@ import (
 )
 
 func RegisterHandlers(group *echo.Group) {
-	nodeGroup := group.Group("/node", auth.AuthenticateClowder, middleware.PrepareModel)
+	nodeGroup := group.Group("/node", auth.AuthenticateClowder, middleware.PrepareNodeModel)
 	node.RegisterHandlers(nodeGroup)
 
 	clientGroup := group.Group("/client", auth.AuthenticateClowdee)

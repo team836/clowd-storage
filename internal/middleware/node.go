@@ -16,7 +16,7 @@ Middelware for node api group.
 /**
 Middleware for preparing the node model.
 */
-func PrepareModel(next echo.HandlerFunc) echo.HandlerFunc {
+func PrepareNodeModel(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
 		clowderModel := ctx.Get("clowder").(*model.Clowder) // get current clowder model
 		machineID := ctx.QueryParam("mid")                  // get clowder machine id
