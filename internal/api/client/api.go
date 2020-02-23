@@ -2,6 +2,7 @@ package client
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/team836/clowd-storage/internal/module/cwde"
@@ -183,13 +184,25 @@ func download(ctx echo.Context) error {
 		}
 	}
 
-	//// schedule every shards for download to the each nodes
-	//quotas := dq.Schedule()
-	//
-	//// download each quota using goroutine
-	//for machineID, shards := range quotas {
-	//
-	//}
+	// schedule every shards for download to the each nodes
+	quotas := dq.Schedule()
+
+	var downloadWG sync.WaitGroup
+
+	// download each quota using goroutine
+	for machineID, shards := range quotas {
+		// if the node is active
+		if activeNode := cwdr.Pool().FindActiveNode(machineID); activeNode != nil {
+			downloadWG.Add(1)
+
+			go func(wg *sync.WaitGroup, a *cwdr.ActiveNode, s []*model.ShardToLoad) {
+				a.Load <- &cwdr.LoadChan{Shards: s, WG: wg}
+			}(&downloadWG, activeNode, shards)
+		}
+	}
+
+	// wait for all download are done
+	downloadWG.Wait()
 
 	return nil
 }
