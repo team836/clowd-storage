@@ -25,10 +25,19 @@ const (
 	loadWait = 30 * time.Second
 
 	maxLoadSize = 1048576
+
+	uploadType = "save"
+
+	downloadType = "down"
 )
 
 type shardToDown struct {
 	Name string `json:"name"`
+}
+
+type DataMsg struct {
+	Type     string      `json:"type"`
+	Contents interface{} `json:"contents"`
 }
 
 type LoadChan struct {
@@ -128,7 +137,7 @@ func (node *ActiveNode) Run() {
 		case shards := <-node.Save:
 			_ = node.conn.SetWriteDeadline(time.Now().Add(saveWait))
 			// byte array data are send as base64 encoded format
-			if err := node.conn.WriteJSON(shards); err != nil {
+			if err := node.conn.WriteJSON(DataMsg{Type: uploadType, Contents: shards}); err != nil {
 				logger.File().Errorf("Error saving file to node, %s", err)
 				return
 			}
@@ -146,7 +155,7 @@ func (node *ActiveNode) Run() {
 
 			// send the download list
 			_ = node.conn.SetWriteDeadline(time.Now().Add(msgWait))
-			if err := node.conn.WriteJSON(*shardsToDown); err != nil {
+			if err := node.conn.WriteJSON(DataMsg{Type: downloadType, Contents: *shardsToDown}); err != nil {
 				logger.File().Infof("Error sending download list to node, %s", err)
 				loadChan.WG.Done()
 				return
@@ -156,7 +165,7 @@ func (node *ActiveNode) Run() {
 
 			// receive the shards data
 			_ = node.conn.SetReadDeadline(time.Now().Add(loadWait))
-			if err := node.conn.ReadJSON(*receivedShards); err != nil {
+			if err := node.conn.ReadJSON(receivedShards); err != nil {
 				logger.File().Infof("Error downloading data from node, %s", err)
 				loadChan.WG.Done()
 				return
