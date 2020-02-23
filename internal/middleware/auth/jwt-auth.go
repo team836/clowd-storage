@@ -3,21 +3,16 @@ package auth
 import (
 	"net/http"
 
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/spf13/viper"
+
 	"github.com/team836/clowd-storage/pkg/logger"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	"github.com/spf13/viper"
 	"github.com/team836/clowd-storage/internal/model"
 	"github.com/team836/clowd-storage/pkg/database"
 )
-
-// JWTConfig authentication config
-var JWTConfig = middleware.JWTConfig{
-	Claims:     &JWTCustomClaims{},
-	SigningKey: []byte(viper.GetString("JWT.SECRET")),
-}
 
 /**
 JWTCustomClaims are custom claims extending default ones.
@@ -26,6 +21,14 @@ type JWTCustomClaims struct {
 	UserID   string `json:"sub"`
 	UserName string `json:"aud"`
 	jwt.StandardClaims
+}
+
+// JWTConfig authentication config
+func JWTConfig() *middleware.JWTConfig {
+	return &middleware.JWTConfig{
+		Claims:     &JWTCustomClaims{},
+		SigningKey: []byte(viper.GetString("JWT.SECRET")),
+	}
 }
 
 /**
