@@ -17,12 +17,18 @@ const (
 
 	maxPongSize = 512
 
+	msgWait = 500 * time.Millisecond
+
 	saveWait = 30 * time.Second
 
-	//loadWait = 30 * time.Second
-	//
-	//maxLoadSize = 1048576
+	loadWait = 30 * time.Second
+
+	maxLoadSize = 1048576
 )
+
+type shardToDown struct {
+	Name string `json:"name"`
+}
 
 type Status struct {
 	// TODO: measure rtt when ping and pong
@@ -56,8 +62,8 @@ type ActiveNode struct {
 	// save shards on the node
 	Save chan []*model.ShardToSave
 
-	//// load shards from the node
-	//Load chan []*cwde.ShardToLoad
+	// load shards from the node
+	Load chan []*model.ShardToLoad
 
 	// websocket connection
 	conn *websocket.Conn
@@ -72,7 +78,7 @@ func NewActiveNode(conn *websocket.Conn, nodeModel *model.Node) *ActiveNode {
 		},
 		Ping: make(chan bool, 1), // buffered channel for trying ping
 		Save: make(chan []*model.ShardToSave),
-		//Load: make(chan []*cwde.ShardToLoad),
+		Load: make(chan []*model.ShardToLoad),
 		conn: conn,
 	}
 
@@ -119,6 +125,50 @@ func (node *ActiveNode) Run() {
 			if err := node.conn.WriteJSON(shards); err != nil {
 				logger.File().Errorf("Error saving file to node, %s", err)
 				return
+			}
+		case shards := <-node.Load:
+			node.conn.SetReadLimit(maxLoadSize)
+
+			// make download list
+			shardsToDown := &[]*shardToDown{}
+			for _, shard := range shards {
+				*shardsToDown = append(
+					*shardsToDown,
+					&shardToDown{Name: shard.Model.Name},
+				)
+			}
+
+			// send the download list
+			_ = node.conn.SetWriteDeadline(time.Now().Add(msgWait))
+			if err := node.conn.WriteJSON(*shardsToDown); err != nil {
+				logger.File().Infof("Error sending download list to node, %s", err)
+				return
+			}
+
+			receivedShards := &[]*model.ShardToSave{}
+
+			// receive the shards data
+			_ = node.conn.SetReadDeadline(time.Now().Add(loadWait))
+			if err := node.conn.ReadJSON(*receivedShards); err != nil {
+				logger.File().Infof("Error downloading data from node, %s", err)
+				return
+			}
+
+			// if count of shards is different
+			if len(shards) != len(*receivedShards) {
+				logger.File().Infof("Count of shards is different, maybe malformed data")
+				return
+			}
+
+			// copy shard data
+			for idx, receivedShard := range *receivedShards {
+				// check if whether received data name is same
+				if shards[idx].Model.Name != receivedShard.Name {
+					logger.File().Infof("Shard name is different, maybe malformed data")
+					return
+				}
+
+				shards[idx].Data = receivedShard.Data
 			}
 		}
 	}
