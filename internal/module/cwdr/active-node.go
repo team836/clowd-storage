@@ -24,7 +24,7 @@ const (
 
 	loadWait = 30 * time.Second
 
-	maxLoadSize = 1048576
+	maxLoadSize = 104857600 // 100MB
 
 	uploadType = "save"
 
