@@ -43,9 +43,10 @@ type fileToDown struct {
 }
 
 func RegisterHandlers(group *echo.Group) {
-	group.GET("/dir", fileList)
-	group.POST("/files", upload, middleware.BodyLimit(uploadLimit))
-	group.GET("/files", download)
+	group.GET("/dir", fileListController)
+	group.POST("/files", uploadController, middleware.BodyLimit(uploadLimit))
+	group.GET("/files", downloadController)
+	group.DELETE("/files", deleteController)
 }
 
 /**
@@ -59,7 +60,7 @@ File upload requested by client(clowdee).
 - Update the selected nodes' status by prediction.
 - Finally save the files to the nodes.
 */
-func upload(ctx echo.Context) error {
+func uploadController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind uploaded data into array of `fileOnClient` struct
@@ -153,7 +154,7 @@ func upload(ctx echo.Context) error {
 /**
 Get clowdee's all uploaded file list.
 */
-func fileList(ctx echo.Context) error {
+func fileListController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	fileList := &[]*fileView{}
@@ -178,7 +179,7 @@ func fileList(ctx echo.Context) error {
 /**
 File download requested by client(clowdee).
 */
-func download(ctx echo.Context) error {
+func downloadController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind download list from header
@@ -310,4 +311,9 @@ func restoreShards(reconstructedShards []*model.ShardToLoad) {
 			a.Save <- s
 		}(nodeToSave, restoreShards)
 	}
+}
+
+func deleteController(ctx echo.Context) error {
+
+	return ctx.NoContent(http.StatusNoContent)
 }
