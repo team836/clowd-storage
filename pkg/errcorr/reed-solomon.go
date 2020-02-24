@@ -55,25 +55,39 @@ func Encode(base64Data string) ([][]byte, uint, error) {
 Decode the shards to the original file using reed solomon algorithm.
 When some data are missed, reconstruct them.
 */
-func Decode(shards [][]byte, dataSize int) (string, error) {
+func Decode(shards [][]byte, dataSize int) (string, [][]byte, error) {
+	// collect missing shard index
+	var missingIndexes []int
+	for idx, shard := range shards {
+		if shard == nil {
+			missingIndexes = append(missingIndexes, idx)
+		}
+	}
+
 	// create read solomon encoder
 	enc, _ := reedsolomon.New(dataShards, parityShards)
 
 	// decode(reconstruct) the missing shards
 	err := enc.Reconstruct(shards)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	// join the shards
+	// collect reconstructed shards
+	reconstructedData := make([][]byte, 0)
+	for _, idx := range missingIndexes {
+		reconstructedData = append(reconstructedData, shards[idx])
+	}
+
+	// join the all shards
 	buf := &bytes.Buffer{}
 	err = enc.Join(buf, shards, dataSize)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	// convert byte array to base64 string
-	data := base64.StdEncoding.EncodeToString(buf.Bytes())
+	fileData := base64.StdEncoding.EncodeToString(buf.Bytes())
 
-	return data, nil
+	return fileData, reconstructedData, nil
 }
