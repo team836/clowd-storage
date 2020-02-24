@@ -18,6 +18,10 @@ type ShardToLoad struct {
 	Data  []byte
 }
 
+type ShardToDelete struct {
+	Name string `json:"name"`
+}
+
 type Shard struct {
 	// column fields
 	Name      string `gorm:"type:varchar(255);primary_key"`

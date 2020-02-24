@@ -42,6 +42,10 @@ type fileToDown struct {
 	Name string `json:"name"`
 }
 
+type fileToDelete struct {
+	fileToDown
+}
+
 func RegisterHandlers(group *echo.Group) {
 	group.GET("/dir", fileListController)
 	group.POST("/files", uploadController, middleware.BodyLimit(uploadLimit))
@@ -314,6 +318,14 @@ func restoreShards(reconstructedShards []*model.ShardToLoad) {
 }
 
 func deleteController(ctx echo.Context) error {
+	clowdee := ctx.Get("clowdee").(*model.Clowdee)
+
+	// bind deleteList into array of `fileToDelete` struct
+	files := &[]*fileToDelete{}
+	if err := ctx.Bind(files); err != nil {
+		logger.File().Infof("Error binding client's delete list, %s", err)
+		return err
+	}
 
 	return ctx.NoContent(http.StatusNoContent)
 }
