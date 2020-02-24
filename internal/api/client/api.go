@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -67,18 +68,20 @@ func upload(ctx echo.Context) error {
 
 	// encode every file data using reed solomon algorithm
 	for _, file := range *files {
-		shards, err := errcorr.Encode(file.Data)
+		// encode the file data
+		shards, size, err := errcorr.Encode(file.Data)
 		if err != nil {
 			logger.File().Infof("Error encoding the file, %s", err)
 			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
+		// push to upload queue
 		encFile := &model.EncFile{
 			Model: &model.File{
 				GoogleID: clowdee.GoogleID,
 				Name:     file.Name,
 				Position: int16(file.Order),
-				Size:     uint(len(file.Data)),
+				Size:     size,
 			},
 			Data: shards,
 		}
@@ -164,11 +167,11 @@ File download requested by client(clowdee).
 func download(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
-	// bind download list
+	// bind download list from header
 	downloadList := &[]*fileToDown{}
-	if err := ctx.Bind(downloadList); err != nil {
+	if err := json.Unmarshal([]byte(ctx.Request().Header.Get("files")), downloadList); err != nil {
 		logger.File().Infof("Error binding client's download list, %s", err)
-		return err
+		return ctx.String(http.StatusNotAcceptable, "Invalid request format")
 	}
 
 	dq := cwde.NewDQ()
@@ -184,25 +187,53 @@ func download(ctx echo.Context) error {
 		}
 	}
 
-	// schedule every shards for download to the each nodes
+	// schedule every shards for download to the each active nodes
+	// and get quotas for each nodes
 	quotas := dq.Schedule()
 
+	// concurrently download each quota using goroutine
 	var downloadWG sync.WaitGroup
-
-	// download each quota using goroutine
 	for machineID, shards := range quotas {
-		// if the node is active
+		// if the machine is active
 		if activeNode := cwdr.Pool().FindActiveNode(machineID); activeNode != nil {
 			downloadWG.Add(1)
 
-			go func(wg *sync.WaitGroup, a *cwdr.ActiveNode, s []*model.ShardToLoad) {
+			// start new worker for download
+			go func(a *cwdr.ActiveNode, s []*model.ShardToLoad, wg *sync.WaitGroup) {
 				a.Load <- &cwdr.LoadChan{Shards: s, WG: wg}
-			}(&downloadWG, activeNode, shards)
+			}(activeNode, shards, &downloadWG)
 		}
 	}
 
-	// wait for all download are done
+	// wait for all download workers are done
 	downloadWG.Wait()
 
-	return nil
+	// make response data
+	resFiles := &[]*fileOnClient{}
+	for _, file := range dq.Files {
+		shards := make([][]byte, 0)
+
+		// merge all shard data
+		for _, loadedShard := range file.Shards {
+			shards = append(shards, loadedShard.Data)
+		}
+
+		// reconstruct the original file from the shards
+		data, err := errcorr.Decode(shards, int(file.Model.Size))
+		if err != nil {
+			logger.File().Infof("Error decoding the shards, %s", err)
+			return ctx.String(http.StatusInternalServerError, "file download error")
+		}
+
+		*resFiles = append(
+			*resFiles,
+			&fileOnClient{
+				Name:  file.Model.Name,
+				Order: int(file.Model.Position),
+				Data:  data,
+			},
+		)
+	}
+
+	return ctx.JSON(http.StatusOK, resFiles)
 }
