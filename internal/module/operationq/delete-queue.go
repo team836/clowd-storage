@@ -42,3 +42,31 @@ func (delQ *DeleteQueue) Push(googleID string, fileNames ...string) error {
 
 	return nil
 }
+
+/**
+Assign shards for deletion to the each nodes
+which are identified by machine id.
+*/
+func (delQ *DeleteQueue) Schedule() map[string][]*model.ShardToDelete {
+	quotas := make(map[string][]*model.ShardToDelete)
+
+	// for every files to delete
+	for _, file := range delQ.Files {
+		// for every shards of the file
+		for _, shard := range file.Shards {
+			shard := shard
+			quotas[shard.MachineID] = append(
+				quotas[shard.MachineID],
+				&model.ShardToDelete{Name: shard.Name},
+			)
+
+			// delete shard record
+			database.Conn().Delete(&shard)
+		}
+
+		// delete file record
+		database.Conn().Delete(file)
+	}
+
+	return quotas
+}
