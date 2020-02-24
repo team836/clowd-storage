@@ -1,4 +1,4 @@
-package loadq
+package operationq
 
 import (
 	"errors"

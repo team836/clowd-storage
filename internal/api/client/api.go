@@ -8,7 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4/middleware"
 
-	"github.com/team836/clowd-storage/internal/module/loadq"
+	"github.com/team836/clowd-storage/internal/module/operationq"
 	"github.com/team836/clowd-storage/internal/module/spool"
 
 	"github.com/team836/clowd-storage/pkg/database"
@@ -75,7 +75,7 @@ func uploadController(ctx echo.Context) error {
 	}
 
 	// create upload queue
-	uq := loadq.NewUQ()
+	uq := operationq.NewUQ()
 
 	// encode every file data using reed solomon algorithm
 	// and push to upload queue
@@ -135,7 +135,7 @@ func uploadController(ctx echo.Context) error {
 		spool.Pool().NodesStatusLock.Unlock()
 		logger.File().Errorf("Error scheduling upload, %s", err)
 
-		if err == loadq.ErrLackOfStorage {
+		if err == operationq.ErrLackOfStorage {
 			return ctx.String(http.StatusNotAcceptable, err.Error())
 		}
 
@@ -193,12 +193,12 @@ func downloadController(ctx echo.Context) error {
 		return ctx.String(http.StatusNotAcceptable, "Invalid request format")
 	}
 
-	dq := loadq.NewDQ()
+	dq := operationq.NewDQ()
 
 	// read download list and add them to download queue
 	for _, file := range *downloadList {
 		if err := dq.Push(clowdee.GoogleID, file.Name); err != nil {
-			if err == loadq.ErrFileNotExist {
+			if err == operationq.ErrFileNotExist {
 				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
 			}
 
@@ -286,7 +286,7 @@ func downloadController(ctx echo.Context) error {
 Restore(re-upload) the reconstruct shards to the another nodes.
 */
 func restoreShards(reconstructedShards []*model.ShardToLoad) {
-	rq := loadq.NewRQ()
+	rq := operationq.NewRQ()
 	rq.Push(reconstructedShards...)
 
 	spool.Pool().NodesStatusLock.Lock()
