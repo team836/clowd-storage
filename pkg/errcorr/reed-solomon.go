@@ -72,7 +72,7 @@ func Decode(shards [][]byte, dataSize int) (string, error) {
 		return "", err
 	}
 
-	// make base64 string from byte buffer
+	// convert byte array to base64 string
 	data := base64.StdEncoding.EncodeToString(buf.Bytes())
 
 	return data, nil
