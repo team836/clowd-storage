@@ -75,7 +75,6 @@ func upload(ctx echo.Context) error {
 			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
-		// push to upload queue
 		encFile := &model.EncFile{
 			Model: &model.File{
 				GoogleID: clowdee.GoogleID,
@@ -85,6 +84,14 @@ func upload(ctx echo.Context) error {
 			},
 			Data: shards,
 		}
+
+		// if the file is already exists
+		if !database.Conn().NewRecord(encFile.Model) {
+			logger.File().Infof("The file is already exists")
+			return ctx.String(http.StatusNotAcceptable, `"`+encFile.Model.Name+`" is already exists`)
+		}
+
+		// push to upload queue
 		uq.Push(encFile)
 	}
 
