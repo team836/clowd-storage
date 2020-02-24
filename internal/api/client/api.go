@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labstack/echo/v4/middleware"
+
 	"github.com/team836/clowd-storage/internal/module/loadq"
 	"github.com/team836/clowd-storage/internal/module/spool"
 
@@ -18,6 +20,10 @@ import (
 	"github.com/team836/clowd-storage/pkg/logger"
 
 	"github.com/labstack/echo/v4"
+)
+
+const (
+	uploadLimit = "100M"
 )
 
 type fileOnClient struct {
@@ -38,7 +44,7 @@ type fileToDown struct {
 
 func RegisterHandlers(group *echo.Group) {
 	group.GET("/dir", fileList)
-	group.POST("/files", upload)
+	group.POST("/files", upload, middleware.BodyLimit(uploadLimit))
 	group.GET("/files", download)
 }
 
@@ -67,6 +73,7 @@ func upload(ctx echo.Context) error {
 	uq := loadq.NewUQ()
 
 	// encode every file data using reed solomon algorithm
+	// and push to upload queue
 	for _, file := range *files {
 		// encode the file data
 		shards, size, err := errcorr.Encode(file.Data)
@@ -75,7 +82,6 @@ func upload(ctx echo.Context) error {
 			return ctx.String(http.StatusNotAcceptable, "Cannot handle this file: "+file.Name)
 		}
 
-		// push to upload queue
 		encFile := &model.EncFile{
 			Model: &model.File{
 				GoogleID: clowdee.GoogleID,
@@ -85,6 +91,14 @@ func upload(ctx echo.Context) error {
 			},
 			Data: shards,
 		}
+
+		// if the file is already exists
+		if !database.Conn().NewRecord(encFile.Model) {
+			logger.File().Infof("The file is already exists")
+			return ctx.String(http.StatusNotAcceptable, `"`+encFile.Model.Name+`" is already exists`)
+		}
+
+		// push to upload queue
 		uq.Push(encFile)
 	}
 
@@ -214,7 +228,14 @@ func download(ctx echo.Context) error {
 		shards := make([][]byte, 0)
 
 		// merge all shard data
+		// if the shard is invalid, make to nil for reconstruction
 		for _, loadedShard := range file.Shards {
+			// if shard is missing or corrupted
+			if len(loadedShard.Data) == 0 ||
+				errcorr.IsCorruptedChecksum(loadedShard.Data, loadedShard.Model.Checksum) {
+				loadedShard.Data = nil
+			}
+
 			shards = append(shards, loadedShard.Data)
 		}
 
