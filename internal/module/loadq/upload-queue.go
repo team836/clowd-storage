@@ -49,9 +49,6 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Act
 	// sort the files to upload before scheduling
 	uq.sort()
 
-	currRing := safeRing
-	quotas := make(map[*spool.ActiveNode][]*model.ShardToSave)
-
 	// begin a transaction
 	tx := database.Conn().Begin()
 	defer func() {
@@ -67,8 +64,10 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Act
 	}
 
 	phase := Phase1
-	prevSafeRing := currRing
+	prevSafeRing := safeRing
 	prevUnsafeRing := unsafeRing
+	currRing := safeRing
+	quotas := make(map[*spool.ActiveNode][]*model.ShardToSave)
 
 	// for every files to save
 	for _, file := range uq.Files {
@@ -99,8 +98,8 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Act
 						// change to phase2 when
 						// no longer there are none possible things among the safe nodes
 						phase = Phase2
-						prevSafeRing = currRing // save current safe ring
-						currRing = prevUnsafeRing
+						prevSafeRing = currRing   // save current safe ring
+						currRing = prevUnsafeRing // move curr ring to previous unsafe ring
 						tolerance = 0
 					} else if phase == Phase2 {
 						// reach at this point when
