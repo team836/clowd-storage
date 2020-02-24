@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/team836/clowd-storage/pkg/database"
+
 	"github.com/team836/clowd-storage/internal/model"
 
 	"github.com/team836/clowd-storage/pkg/logger"
@@ -207,6 +209,12 @@ func (node *ActiveNode) Run() {
 
 			// send the deletion list
 			if err := node.conn.WriteJSON(DataMsg{Type: deleteType, Contents: shards}); err != nil {
+				// record to database for later deletion because currently cannot delete
+				for _, shard := range shards {
+					database.Conn().
+						Create(&model.DeletedShard{Name: shard.Name, MachineID: node.Model.MachineID})
+				}
+
 				logger.File().Errorf("Error sending deletion list to node, %s", err)
 				return
 			}
