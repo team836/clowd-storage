@@ -228,7 +228,14 @@ func download(ctx echo.Context) error {
 		shards := make([][]byte, 0)
 
 		// merge all shard data
+		// if the shard is invalid, make to nil for reconstruction
 		for _, loadedShard := range file.Shards {
+			// if shard is missing or corrupted
+			if len(loadedShard.Data) == 0 ||
+				errcorr.IsCorruptedChecksum(loadedShard.Data, loadedShard.Model.Checksum) {
+				loadedShard.Data = nil
+			}
+
 			shards = append(shards, loadedShard.Data)
 		}
 
