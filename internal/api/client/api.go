@@ -222,39 +222,63 @@ func download(ctx echo.Context) error {
 	// wait for all download workers are done
 	downloadWG.Wait()
 
+	response := make([]*fileOnClient, 0)
+	reconstructedShards := make([]*model.ShardToLoad, 0)
+
 	// make response data
-	resFiles := &[]*fileOnClient{}
 	for _, file := range dq.Files {
-		shards := make([][]byte, 0)
+		var shards [][]byte
+		var missedShards []*model.ShardToLoad
 
 		// merge all shard data
 		// if the shard is invalid, make to nil for reconstruction
 		for _, loadedShard := range file.Shards {
-			// if shard is missing or corrupted
+			// if shard is missing or corrupted, make to nil data
 			if len(loadedShard.Data) == 0 ||
 				errcorr.IsCorruptedChecksum(loadedShard.Data, loadedShard.Model.Checksum) {
 				loadedShard.Data = nil
+			}
+
+			// if shard data is missed, add to missed list
+			if loadedShard.Data == nil {
+				missedShards = append(missedShards, loadedShard)
 			}
 
 			shards = append(shards, loadedShard.Data)
 		}
 
 		// reconstruct the original file from the shards
-		data, err := errcorr.Decode(shards, int(file.Model.Size))
+		fileData, reconstructedShardData, err := errcorr.Decode(shards, int(file.Model.Size))
 		if err != nil {
 			logger.File().Infof("Error decoding the shards, %s", err)
 			return ctx.String(http.StatusInternalServerError, "file download error")
 		}
 
-		*resFiles = append(
-			*resFiles,
+		// insert reconstructed data to the missed list
+		for idx, missedShard := range missedShards {
+			missedShard.Data = reconstructedShardData[idx]
+		}
+
+		// merge to all missed list
+		reconstructedShards = append(reconstructedShards, missedShards...)
+
+		response = append(
+			response,
 			&fileOnClient{
 				Name:  file.Model.Name,
 				Order: int(file.Model.Position),
-				Data:  data,
+				Data:  fileData,
 			},
 		)
 	}
 
-	return ctx.JSON(http.StatusOK, resFiles)
+	go restoreShards(reconstructedShards)
+
+	return ctx.JSON(http.StatusOK, &response)
+}
+
+/**
+Restore(re-upload) the reconstruct shards to the another nodes.
+*/
+func restoreShards(reconstructedShards []*model.ShardToLoad) {
 }
