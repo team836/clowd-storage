@@ -33,6 +33,8 @@ const (
 	uploadType = "save"
 
 	downloadType = "down"
+
+	deleteType = "delete"
 )
 
 type shardToDown struct {
@@ -84,6 +86,9 @@ type ActiveNode struct {
 	// load shards from the node
 	Load chan *LoadChan
 
+	// delete shards on the node
+	Delete chan []*model.ShardToDelete
+
 	// websocket connection
 	conn *websocket.Conn
 }
@@ -95,10 +100,11 @@ func NewActiveNode(conn *websocket.Conn, nodeModel *model.Node) *ActiveNode {
 			lastCheckedAt: time.Now().Add(-24 * time.Hour),
 			isOld:         true,
 		},
-		Ping: make(chan bool, 1), // buffered channel for trying ping
-		Save: make(chan []*model.ShardToSave),
-		Load: make(chan *LoadChan),
-		conn: conn,
+		Ping:   make(chan bool, 1), // buffered channel for trying ping
+		Save:   make(chan []*model.ShardToSave),
+		Load:   make(chan *LoadChan),
+		Delete: make(chan []*model.ShardToDelete),
+		conn:   conn,
 	}
 
 	return c
@@ -140,6 +146,7 @@ func (node *ActiveNode) Run() {
 			Pool().pingWaitGroup.Done()
 		case shards := <-node.Save:
 			_ = node.conn.SetWriteDeadline(time.Now().Add(saveWait))
+
 			// byte array data are send as base64 encoded format
 			if err := node.conn.WriteJSON(DataMsg{Type: uploadType, Contents: shards}); err != nil {
 				logger.File().Errorf("Error saving file to node, %s", err)
@@ -195,6 +202,14 @@ func (node *ActiveNode) Run() {
 			}
 
 			loadChan.WG.Done()
+		case shards := <-node.Delete:
+			_ = node.conn.SetWriteDeadline(time.Now().Add(msgSendWait))
+
+			// send the deletion list
+			if err := node.conn.WriteJSON(DataMsg{Type: deleteType, Contents: shards}); err != nil {
+				logger.File().Errorf("Error sending deletion list to node, %s", err)
+				return
+			}
 		}
 	}
 }
