@@ -17,7 +17,7 @@ var (
 )
 
 type UploadQueue struct {
-	files []*model.EncFile
+	Files []*model.EncFile
 }
 
 func NewUQ() *UploadQueue {
@@ -29,7 +29,7 @@ func NewUQ() *UploadQueue {
 Push the encoded file to queue.
 */
 func (uq *UploadQueue) Push(file *model.EncFile) {
-	uq.files = append(uq.files, file)
+	uq.Files = append(uq.Files, file)
 }
 
 /**
@@ -69,7 +69,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Act
 	}
 
 	// for every files to save
-	for _, file := range uq.files {
+	for _, file := range uq.Files {
 		// create the file record
 		if err := tx.Create(file.Model).Error; err != nil {
 			tx.Rollback()
@@ -141,7 +141,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Act
 Sort the files by shard size in descending order.
 */
 func (uq *UploadQueue) sort() {
-	sort.Slice(uq.files, func(i, j int) bool {
-		return len(uq.files[i].Data[0]) > len(uq.files[j].Data[0])
+	sort.Slice(uq.Files, func(i, j int) bool {
+		return len(uq.Files[i].Data[0]) > len(uq.Files[j].Data[0])
 	})
 }
