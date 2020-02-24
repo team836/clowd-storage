@@ -341,5 +341,26 @@ func deleteController(ctx echo.Context) error {
 		}
 	}
 
+	// schedule every shards for deletion to the each active nodes
+	// and get quotas for each nodes
+	quotas := delQ.Schedule()
+
+	// delete each quota using goroutine
+	for machineID, shards := range quotas {
+		// if the machine is active
+		if activeNode := spool.Pool().FindActiveNode(machineID); activeNode != nil {
+			// delete the quota concurrently
+			go func(a *spool.ActiveNode, s []*model.ShardToDelete) {
+				a.Delete <- s
+			}(activeNode, shards)
+		} else { // if the machine is not active (cannot delete currently)
+			// record to database for later deletion
+			for _, shard := range shards {
+				database.Conn().
+					Create(&model.DeletedShard{Name: shard.Name, MachineID: machineID})
+			}
+		}
+	}
+
 	return ctx.NoContent(http.StatusNoContent)
 }
