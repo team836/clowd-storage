@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/team836/clowd-storage/internal/module/cwde"
-	"github.com/team836/clowd-storage/internal/module/cwdr"
+	"github.com/team836/clowd-storage/internal/module/loadq"
+	"github.com/team836/clowd-storage/internal/module/spool"
 
 	"github.com/team836/clowd-storage/pkg/database"
 
@@ -64,7 +64,7 @@ func upload(ctx echo.Context) error {
 	}
 
 	// create upload queue
-	uq := cwde.NewUQ()
+	uq := loadq.NewUQ()
 
 	// encode every file data using reed solomon algorithm
 	for _, file := range *files {
@@ -90,21 +90,21 @@ func upload(ctx echo.Context) error {
 
 	// this area almost change all nodes' status
 	// so, protect it using mutex for all node's status
-	cwdr.Pool().NodesStatusLock.Lock()
+	spool.Pool().NodesStatusLock.Lock()
 	defer func() {
 		// when panic is occurred, unlock the nodes status lock
 		if r := recover(); r != nil {
-			cwdr.Pool().NodesStatusLock.Unlock()
+			spool.Pool().NodesStatusLock.Unlock()
 		}
 	}()
 
 	// check all nodes' status by ping&pong
-	cwdr.Pool().CheckAllNodes()
+	spool.Pool().CheckAllNodes()
 
 	// node selection
-	safeRing, unsafeRing := cwdr.Pool().SelectNodes()
+	safeRing, unsafeRing := spool.Pool().SelectNodes()
 	if safeRing.Len()+unsafeRing.Len() == 0 {
-		cwdr.Pool().NodesStatusLock.Unlock()
+		spool.Pool().NodesStatusLock.Unlock()
 		logger.File().Errorf("Available nodes are not exist.")
 		return ctx.String(http.StatusNotAcceptable, "Cannot save the files because currently there are no available nodes")
 	}
@@ -113,10 +113,10 @@ func upload(ctx echo.Context) error {
 	// and get results
 	quotas, err := uq.Schedule(safeRing, unsafeRing)
 	if err != nil {
-		cwdr.Pool().NodesStatusLock.Unlock()
+		spool.Pool().NodesStatusLock.Unlock()
 		logger.File().Errorf("Error scheduling upload, %s", err)
 
-		if err == cwde.ErrLackOfStorage {
+		if err == loadq.ErrLackOfStorage {
 			return ctx.String(http.StatusNotAcceptable, err.Error())
 		}
 
@@ -125,13 +125,13 @@ func upload(ctx echo.Context) error {
 
 	// save each quota using goroutine
 	for nodeToSave, shards := range quotas {
-		go func(a *cwdr.ActiveNode, s []*model.ShardToSave) {
+		go func(a *spool.ActiveNode, s []*model.ShardToSave) {
 			a.Save <- s
 		}(nodeToSave, shards)
 	}
 
 	// end of mutex area for nodes status lock
-	cwdr.Pool().NodesStatusLock.Unlock()
+	spool.Pool().NodesStatusLock.Unlock()
 
 	return ctx.NoContent(http.StatusCreated)
 }
@@ -174,12 +174,12 @@ func download(ctx echo.Context) error {
 		return ctx.String(http.StatusNotAcceptable, "Invalid request format")
 	}
 
-	dq := cwde.NewDQ()
+	dq := loadq.NewDQ()
 
 	// read download list and add them to download queue
 	for _, file := range *downloadList {
 		if err := dq.Push(clowdee.GoogleID, file.Name); err != nil {
-			if err == cwde.ErrFileNotExist {
+			if err == loadq.ErrFileNotExist {
 				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
 			}
 
@@ -195,12 +195,12 @@ func download(ctx echo.Context) error {
 	var downloadWG sync.WaitGroup
 	for machineID, shards := range quotas {
 		// if the machine is active
-		if activeNode := cwdr.Pool().FindActiveNode(machineID); activeNode != nil {
+		if activeNode := spool.Pool().FindActiveNode(machineID); activeNode != nil {
 			downloadWG.Add(1)
 
 			// start new worker for download
-			go func(a *cwdr.ActiveNode, s []*model.ShardToLoad, wg *sync.WaitGroup) {
-				a.Load <- &cwdr.LoadChan{Shards: s, WG: wg}
+			go func(a *spool.ActiveNode, s []*model.ShardToLoad, wg *sync.WaitGroup) {
+				a.Load <- &spool.LoadChan{Shards: s, WG: wg}
 			}(activeNode, shards, &downloadWG)
 		}
 	}

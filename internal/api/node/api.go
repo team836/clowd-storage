@@ -3,7 +3,7 @@ package node
 import (
 	"net/http"
 
-	"github.com/team836/clowd-storage/internal/module/cwdr"
+	"github.com/team836/clowd-storage/internal/module/spool"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -34,9 +34,9 @@ func openWebsocket(ctx echo.Context) error {
 	nodeModel := ctx.Get("node").(*model.Node) // get current node model
 
 	// find duplicate node connection and unregistered old one
-	for node := range cwdr.Pool().Nodes {
+	for node := range spool.Pool().Nodes {
 		if node.Model.MachineID == nodeModel.MachineID {
-			cwdr.Pool().Unregister <- node
+			spool.Pool().Unregister <- node
 			break
 		}
 	}
@@ -49,10 +49,10 @@ func openWebsocket(ctx echo.Context) error {
 	}
 
 	// create new node
-	node := cwdr.NewActiveNode(conn, nodeModel)
+	node := spool.NewActiveNode(conn, nodeModel)
 
-	go node.Run()                // run the websocket operations
-	cwdr.Pool().Register <- node // register this node to pool
+	go node.Run()                 // run the websocket operations
+	spool.Pool().Register <- node // register this node to pool
 
 	return nil
 }

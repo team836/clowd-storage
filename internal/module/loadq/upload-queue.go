@@ -1,11 +1,11 @@
-package cwde
+package loadq
 
 import (
 	"container/ring"
 	"errors"
 	"sort"
 
-	"github.com/team836/clowd-storage/internal/module/cwdr"
+	"github.com/team836/clowd-storage/internal/module/spool"
 	"github.com/team836/clowd-storage/pkg/database"
 	"github.com/team836/clowd-storage/pkg/errcorr"
 
@@ -39,7 +39,7 @@ And update metadata and predict nodes' status by scheduling results.
 This function change nodes' status. So you SHOULD use this function with
 the `NodesStatusLock` which is mutex for all nodes' status.
 */
-func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.ActiveNode][]*model.ShardToSave, error) {
+func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.ActiveNode][]*model.ShardToSave, error) {
 	// define constant for indicating current schedule phase
 	const (
 		PHASE1 = 1
@@ -52,7 +52,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Acti
 	uq.sort()
 
 	currRing := safeRing
-	quotas := make(map[*cwdr.ActiveNode][]*model.ShardToSave)
+	quotas := make(map[*spool.ActiveNode][]*model.ShardToSave)
 
 	// begin a transaction
 	tx := database.Conn().Begin()
@@ -80,7 +80,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Acti
 		for pos, shard := range file.Data {
 			tolerance := 0
 			// find the node which can store this shard
-			for currRing.Value.(*cwdr.ActiveNode).Status.Capacity < uint64(len(shard)) {
+			for currRing.Value.(*spool.ActiveNode).Status.Capacity < uint64(len(shard)) {
 				currRing = currRing.Next()
 
 				tolerance++
@@ -100,7 +100,7 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*cwdr.Acti
 			}
 
 			// set current node
-			currNode := currRing.Value.(*cwdr.ActiveNode)
+			currNode := currRing.Value.(*spool.ActiveNode)
 
 			// create the shard record
 			shardModel := &model.Shard{

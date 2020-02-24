@@ -1,4 +1,4 @@
-package cwde
+package loadq
 
 import (
 	"errors"

@@ -1,4 +1,4 @@
-package cwdr
+package spool
 
 import (
 	"sync"
