@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labstack/echo/v4/middleware"
+
 	"github.com/team836/clowd-storage/internal/module/loadq"
 	"github.com/team836/clowd-storage/internal/module/spool"
 
@@ -18,6 +20,10 @@ import (
 	"github.com/team836/clowd-storage/pkg/logger"
 
 	"github.com/labstack/echo/v4"
+)
+
+const (
+	UploadLimit = "100M"
 )
 
 type fileOnClient struct {
@@ -38,7 +44,7 @@ type fileToDown struct {
 
 func RegisterHandlers(group *echo.Group) {
 	group.GET("/dir", fileList)
-	group.POST("/files", upload)
+	group.POST("/files", upload, middleware.BodyLimit(UploadLimit))
 	group.GET("/files", download)
 }
 
@@ -67,6 +73,7 @@ func upload(ctx echo.Context) error {
 	uq := loadq.NewUQ()
 
 	// encode every file data using reed solomon algorithm
+	// and push to upload queue
 	for _, file := range *files {
 		// encode the file data
 		shards, size, err := errcorr.Encode(file.Data)
