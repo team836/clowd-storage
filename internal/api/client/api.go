@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	UploadLimit = "100M"
+	uploadLimit = "100M"
 )
 
 type fileOnClient struct {
@@ -44,7 +44,7 @@ type fileToDown struct {
 
 func RegisterHandlers(group *echo.Group) {
 	group.GET("/dir", fileList)
-	group.POST("/files", upload, middleware.BodyLimit(UploadLimit))
+	group.POST("/files", upload, middleware.BodyLimit(uploadLimit))
 	group.GET("/files", download)
 }
 
