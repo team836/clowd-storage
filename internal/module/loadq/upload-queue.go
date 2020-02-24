@@ -42,17 +42,12 @@ the `NodesStatusLock` which is mutex for all nodes' status.
 func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.ActiveNode][]*model.ShardToSave, error) {
 	// define constant for indicating current schedule phase
 	const (
-		PHASE1 = 1
-		PHASE2 = 2
+		Phase1 = 1
+		Phase2 = 2
 	)
-
-	phase := PHASE1
 
 	// sort the files to upload before scheduling
 	uq.sort()
-
-	currRing := safeRing
-	quotas := make(map[*spool.ActiveNode][]*model.ShardToSave)
 
 	// begin a transaction
 	tx := database.Conn().Begin()
@@ -68,12 +63,26 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Act
 		return nil, err
 	}
 
+	phase := Phase1
+	prevSafeRing := safeRing
+	prevUnsafeRing := unsafeRing
+	currRing := safeRing
+	quotas := make(map[*spool.ActiveNode][]*model.ShardToSave)
+
 	// for every files to save
 	for _, file := range uq.Files {
 		// create the file record
 		if err := tx.Create(file.Model).Error; err != nil {
 			tx.Rollback()
 			return nil, err
+		}
+
+		// if curr phase is phase2, change current phase to phase1
+		// and move curr ring to previous safe ring
+		if phase == Phase2 {
+			phase = Phase1
+			prevUnsafeRing = currRing
+			currRing = prevSafeRing
 		}
 
 		// for every shards
@@ -85,12 +94,14 @@ func (uq *UploadQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Act
 
 				tolerance++
 				if tolerance >= currRing.Len() {
-					if phase == PHASE1 {
+					if phase == Phase1 {
 						// change to phase2 when
 						// no longer there are none possible things among the safe nodes
-						phase = PHASE2
-						currRing = unsafeRing
-					} else if phase == PHASE2 {
+						phase = Phase2
+						prevSafeRing = currRing   // save current safe ring
+						currRing = prevUnsafeRing // move curr ring to previous unsafe ring
+						tolerance = 0
+					} else if phase == Phase2 {
 						// reach at this point when
 						// no longer there are none possible things among the all nodes
 						tx.Rollback() // rollback the transaction
