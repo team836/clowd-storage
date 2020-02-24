@@ -321,10 +321,24 @@ func deleteController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind deleteList into array of `fileToDelete` struct
-	files := &[]*fileToDelete{}
-	if err := ctx.Bind(files); err != nil {
+	files := make([]*fileToDelete, 0)
+	if err := ctx.Bind(&files); err != nil {
 		logger.File().Infof("Error binding client's delete list, %s", err)
 		return err
+	}
+
+	// make file name list
+	nameList := make([]string, 0)
+	for _, file := range files {
+		nameList = append(nameList, file.Name)
+	}
+
+	// read deletion list and add them to delete queue
+	delQ := operationq.NewDelQ()
+	if err := delQ.Push(clowdee.GoogleID, nameList...); err != nil {
+		if err != operationq.ErrFileNotExist {
+			return ctx.NoContent(http.StatusInternalServerError)
+		}
 	}
 
 	return ctx.NoContent(http.StatusNoContent)
