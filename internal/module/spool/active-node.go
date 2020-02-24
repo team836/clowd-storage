@@ -16,16 +16,20 @@ const (
 
 	pongWait = 1 * time.Second
 
-	maxPongSize = 512
-
-	msgWait = 500 * time.Millisecond
+	msgSendWait = 500 * time.Millisecond
 
 	saveWait = 30 * time.Second
 
 	loadWait = 30 * time.Second
+)
+
+const (
+	maxPongSize = 512
 
 	maxLoadSize = 104857600 // 100MB
+)
 
+const (
 	uploadType = "save"
 
 	downloadType = "down"
@@ -154,7 +158,7 @@ func (node *ActiveNode) Run() {
 			}
 
 			// send the download list
-			_ = node.conn.SetWriteDeadline(time.Now().Add(msgWait))
+			_ = node.conn.SetWriteDeadline(time.Now().Add(msgSendWait))
 			if err := node.conn.WriteJSON(DataMsg{Type: downloadType, Contents: *shardsToDown}); err != nil {
 				logger.File().Infof("Error sending download list to node, %s", err)
 				loadChan.WG.Done()
