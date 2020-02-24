@@ -13,7 +13,7 @@ var (
 )
 
 type DownloadQueue struct {
-	files []*model.FileToLoad
+	Files []*model.FileToLoad
 }
 
 func NewDQ() *DownloadQueue {
@@ -71,7 +71,7 @@ func (dq *DownloadQueue) Push(googleID string, fileName string) error {
 			fileToLoad.Shards = append(fileToLoad.Shards, shardToLoad)
 		}
 
-		dq.files = append(dq.files, fileToLoad)
+		dq.Files = append(dq.Files, fileToLoad)
 	}
 
 	return nil
@@ -85,7 +85,7 @@ func (dq *DownloadQueue) Schedule() map[string][]*model.ShardToLoad {
 	quotas := make(map[string][]*model.ShardToLoad)
 
 	// for every files to download
-	for _, file := range dq.files {
+	for _, file := range dq.Files {
 		// for every shards of the file
 		for _, shard := range file.Shards {
 			quotas[shard.Model.MachineID] = append(
