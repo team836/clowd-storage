@@ -281,4 +281,33 @@ func download(ctx echo.Context) error {
 Restore(re-upload) the reconstruct shards to the another nodes.
 */
 func restoreShards(reconstructedShards []*model.ShardToLoad) {
+	rq := loadq.NewRQ()
+	rq.Push(reconstructedShards...)
+
+	spool.Pool().NodesStatusLock.Lock()
+	defer spool.Pool().NodesStatusLock.Unlock()
+
+	spool.Pool().CheckAllNodes()
+
+	// node selection
+	safeRing, unsafeRing := spool.Pool().SelectNodes()
+	if safeRing.Len()+unsafeRing.Len() == 0 {
+		logger.File().Errorf("Available nodes are not exist.")
+		return
+	}
+
+	// schedule restoring for every shards to the nodes
+	// and get results
+	quotas, err := rq.Schedule(safeRing, unsafeRing)
+	if err != nil {
+		logger.File().Errorf("Error scheduling restoring, %s", err)
+		return
+	}
+
+	// save each quota using goroutine
+	for nodeToSave, restoreShards := range quotas {
+		go func(a *spool.ActiveNode, s []*model.ShardToSave) {
+			a.Save <- s
+		}(nodeToSave, restoreShards)
+	}
 }
