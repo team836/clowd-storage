@@ -162,41 +162,41 @@ func (node *ActiveNode) Run() {
 			node.conn.SetReadLimit(maxLoadSize)
 
 			// make download list
-			shardsToDown := &[]*shardToDown{}
+			shardsToDown := make([]*shardToDown, 0)
 			for _, shard := range loadChan.Shards {
-				*shardsToDown = append(
-					*shardsToDown,
+				shardsToDown = append(
+					shardsToDown,
 					&shardToDown{Name: shard.Model.Name},
 				)
 			}
 
 			// send the download list
 			_ = node.conn.SetWriteDeadline(time.Now().Add(msgSendWait))
-			if err := node.conn.WriteJSON(DataMsg{Type: downloadType, Contents: *shardsToDown}); err != nil {
+			if err := node.conn.WriteJSON(DataMsg{Type: downloadType, Contents: shardsToDown}); err != nil {
 				logger.File().Infof("Error sending download list to node, %s", err)
 				loadChan.WG.Done()
 				return
 			}
 
-			receivedShards := &[]*model.ShardToSave{}
+			receivedShards := make([]*model.ShardToSave, 0)
 
 			// receive the shards data
 			_ = node.conn.SetReadDeadline(time.Now().Add(loadWait))
-			if err := node.conn.ReadJSON(receivedShards); err != nil {
+			if err := node.conn.ReadJSON(&receivedShards); err != nil {
 				logger.File().Infof("Error downloading data from node, %s", err)
 				loadChan.WG.Done()
 				return
 			}
 
 			// if count of shards is different
-			if len(loadChan.Shards) != len(*receivedShards) {
+			if len(loadChan.Shards) != len(receivedShards) {
 				logger.File().Infof("Count of shards is different, maybe malformed data")
 				loadChan.WG.Done()
 				return
 			}
 
 			// copy shard data
-			for idx, receivedShard := range *receivedShards {
+			for idx, receivedShard := range receivedShards {
 				// check if whether received data name is same
 				if loadChan.Shards[idx].Model.Name != receivedShard.Name {
 					logger.File().Infof("Shard name is different, maybe malformed data")

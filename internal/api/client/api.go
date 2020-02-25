@@ -68,8 +68,8 @@ func uploadController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind uploaded data into array of `fileOnClient` struct
-	files := &[]*fileOnClient{}
-	if err := ctx.Bind(files); err != nil {
+	files := make([]*fileOnClient, 0)
+	if err := ctx.Bind(&files); err != nil {
 		logger.File().Infof("Error binding client's uploaded file, %s", err)
 		return err
 	}
@@ -79,7 +79,7 @@ func uploadController(ctx echo.Context) error {
 
 	// encode every file data using reed solomon algorithm
 	// and push to upload queue
-	for _, file := range *files {
+	for _, file := range files {
 		// encode the file data
 		shards, size, err := errcorr.Encode(file.Data)
 		if err != nil {
@@ -161,7 +161,7 @@ Get clowdee's all uploaded file list.
 func fileListController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
-	fileList := &[]*fileView{}
+	fileList := make([]*fileView, 0)
 
 	// find from database
 	sqlResult := database.Conn().
@@ -169,7 +169,7 @@ func fileListController(ctx echo.Context) error {
 		Select("name, sum(size) as size, min(uploaded_at) as uploaded_at").
 		Where("google_id = ?", clowdee.GoogleID).
 		Group("name").
-		Scan(fileList)
+		Scan(&fileList)
 
 	// sql error occurred
 	if sqlResult.Error != nil && !sqlResult.RecordNotFound() {
@@ -177,7 +177,7 @@ func fileListController(ctx echo.Context) error {
 		return ctx.NoContent(http.StatusInternalServerError)
 	}
 
-	return ctx.JSON(http.StatusOK, fileList)
+	return ctx.JSON(http.StatusOK, &fileList)
 }
 
 /**
@@ -187,8 +187,8 @@ func downloadController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind download list from header
-	downloadList := &[]*fileToDown{}
-	if err := json.Unmarshal([]byte(ctx.Request().Header.Get("files")), downloadList); err != nil {
+	downloadList := make([]*fileToDown, 0)
+	if err := json.Unmarshal([]byte(ctx.Request().Header.Get("files")), &downloadList); err != nil {
 		logger.File().Infof("Error binding client's download list, %s", err)
 		return ctx.String(http.StatusNotAcceptable, "Invalid request format")
 	}
@@ -196,7 +196,7 @@ func downloadController(ctx echo.Context) error {
 	dq := operationq.NewDQ()
 
 	// read download list and add them to download queue
-	for _, file := range *downloadList {
+	for _, file := range downloadList {
 		if err := dq.Push(clowdee.GoogleID, file.Name); err != nil {
 			if err == operationq.ErrFileNotExist {
 				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
