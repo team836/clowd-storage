@@ -317,10 +317,13 @@ func restoreShards(reconstructedShards []*model.ShardToLoad) {
 	}
 }
 
+/**
+Controller for file deletion request.
+*/
 func deleteController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
-	// bind deleteList into array of `fileToDelete` struct
+	// bind deletion list from the request body
 	files := make([]*fileToDelete, 0)
 	if err := ctx.Bind(&files); err != nil {
 		logger.File().Infof("Error binding client's delete list, %s", err)
@@ -333,8 +336,9 @@ func deleteController(ctx echo.Context) error {
 		nameList = append(nameList, file.Name)
 	}
 
-	// read deletion list and add them to delete queue
 	delQ := operationq.NewDelQ()
+
+	// add deletion list to delete queue
 	if err := delQ.Push(clowdee.GoogleID, nameList...); err != nil {
 		if err != operationq.ErrFileNotExist {
 			return ctx.NoContent(http.StatusInternalServerError)
@@ -345,11 +349,11 @@ func deleteController(ctx echo.Context) error {
 	// and get quotas for each nodes
 	quotas := delQ.Schedule()
 
-	// delete each quota using goroutine
+	// delete quotas concurrently
 	for machineID, shards := range quotas {
 		// if the machine is active
 		if activeNode := spool.Pool().FindActiveNode(machineID); activeNode != nil {
-			// delete the quota concurrently
+			// delete shards on the node concurrently
 			go func(a *spool.ActiveNode, s []*model.ShardToDelete) {
 				a.Delete <- s
 			}(activeNode, shards)
