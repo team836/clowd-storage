@@ -8,6 +8,9 @@ type DeletedShard struct {
 	MachineID string `gorm:"type:varchar(255);not null"`
 }
 
+/**
+Migrate deleted shard table.
+*/
 func MigrateDeletedShard() {
 	database.Conn().Set("gorm:table_options", "CHARSET=utf8mb4").
 		AutoMigrate(&DeletedShard{}).
