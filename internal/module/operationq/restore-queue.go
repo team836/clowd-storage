@@ -99,6 +99,13 @@ func (rq *RestoreQueue) Schedule(safeRing, unsafeRing *ring.Ring) (map[*spool.Ac
 		// set current node
 		currNode := currRing.Value.(*spool.ActiveNode)
 
+		// Before the update metadata,
+		// this shard data on the previous node must be deleted when the node is reconnected.
+		// Because it will be copied to another active node right now.
+		// So record it to database for later deletion.
+		database.Conn().
+			Create(&model.DeletedShard{Name: shard.Model.Name, MachineID: shard.Model.MachineID})
+
 		// update machine id of shard record
 		if err := tx.Model(shard.Model).Update("machine_id", currNode.Model.MachineID).Error; err != nil {
 			tx.Rollback()
