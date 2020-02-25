@@ -8,7 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4/middleware"
 
-	"github.com/team836/clowd-storage/internal/module/loadq"
+	"github.com/team836/clowd-storage/internal/module/operationq"
 	"github.com/team836/clowd-storage/internal/module/spool"
 
 	"github.com/team836/clowd-storage/pkg/database"
@@ -42,10 +42,15 @@ type fileToDown struct {
 	Name string `json:"name"`
 }
 
+type fileToDelete struct {
+	fileToDown
+}
+
 func RegisterHandlers(group *echo.Group) {
-	group.GET("/dir", fileList)
-	group.POST("/files", upload, middleware.BodyLimit(uploadLimit))
-	group.GET("/files", download)
+	group.GET("/dir", fileListController)
+	group.POST("/files", uploadController, middleware.BodyLimit(uploadLimit))
+	group.GET("/files", downloadController)
+	group.DELETE("/files", deleteController)
 }
 
 /**
@@ -59,22 +64,22 @@ File upload requested by client(clowdee).
 - Update the selected nodes' status by prediction.
 - Finally save the files to the nodes.
 */
-func upload(ctx echo.Context) error {
+func uploadController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind uploaded data into array of `fileOnClient` struct
-	files := &[]*fileOnClient{}
-	if err := ctx.Bind(files); err != nil {
+	files := make([]*fileOnClient, 0)
+	if err := ctx.Bind(&files); err != nil {
 		logger.File().Infof("Error binding client's uploaded file, %s", err)
 		return err
 	}
 
 	// create upload queue
-	uq := loadq.NewUQ()
+	uq := operationq.NewUQ()
 
 	// encode every file data using reed solomon algorithm
 	// and push to upload queue
-	for _, file := range *files {
+	for _, file := range files {
 		// encode the file data
 		shards, size, err := errcorr.Encode(file.Data)
 		if err != nil {
@@ -130,7 +135,7 @@ func upload(ctx echo.Context) error {
 		spool.Pool().NodesStatusLock.Unlock()
 		logger.File().Errorf("Error scheduling upload, %s", err)
 
-		if err == loadq.ErrLackOfStorage {
+		if err == operationq.ErrLackOfStorage {
 			return ctx.String(http.StatusNotAcceptable, err.Error())
 		}
 
@@ -153,10 +158,10 @@ func upload(ctx echo.Context) error {
 /**
 Get clowdee's all uploaded file list.
 */
-func fileList(ctx echo.Context) error {
+func fileListController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
-	fileList := &[]*fileView{}
+	fileList := make([]*fileView, 0)
 
 	// find from database
 	sqlResult := database.Conn().
@@ -164,7 +169,7 @@ func fileList(ctx echo.Context) error {
 		Select("name, sum(size) as size, min(uploaded_at) as uploaded_at").
 		Where("google_id = ?", clowdee.GoogleID).
 		Group("name").
-		Scan(fileList)
+		Scan(&fileList)
 
 	// sql error occurred
 	if sqlResult.Error != nil && !sqlResult.RecordNotFound() {
@@ -172,28 +177,28 @@ func fileList(ctx echo.Context) error {
 		return ctx.NoContent(http.StatusInternalServerError)
 	}
 
-	return ctx.JSON(http.StatusOK, fileList)
+	return ctx.JSON(http.StatusOK, &fileList)
 }
 
 /**
 File download requested by client(clowdee).
 */
-func download(ctx echo.Context) error {
+func downloadController(ctx echo.Context) error {
 	clowdee := ctx.Get("clowdee").(*model.Clowdee)
 
 	// bind download list from header
-	downloadList := &[]*fileToDown{}
-	if err := json.Unmarshal([]byte(ctx.Request().Header.Get("files")), downloadList); err != nil {
+	downloadList := make([]*fileToDown, 0)
+	if err := json.Unmarshal([]byte(ctx.Request().Header.Get("files")), &downloadList); err != nil {
 		logger.File().Infof("Error binding client's download list, %s", err)
 		return ctx.String(http.StatusNotAcceptable, "Invalid request format")
 	}
 
-	dq := loadq.NewDQ()
+	dq := operationq.NewDQ()
 
 	// read download list and add them to download queue
-	for _, file := range *downloadList {
+	for _, file := range downloadList {
 		if err := dq.Push(clowdee.GoogleID, file.Name); err != nil {
-			if err == loadq.ErrFileNotExist {
+			if err == operationq.ErrFileNotExist {
 				return ctx.String(http.StatusNotFound, err.Error()+": "+file.Name)
 			}
 
@@ -281,7 +286,12 @@ func download(ctx echo.Context) error {
 Restore(re-upload) the reconstruct shards to the another nodes.
 */
 func restoreShards(reconstructedShards []*model.ShardToLoad) {
-	rq := loadq.NewRQ()
+	// there are not exists shards to restore
+	if len(reconstructedShards) == 0 {
+		return
+	}
+
+	rq := operationq.NewRQ()
 	rq.Push(reconstructedShards...)
 
 	spool.Pool().NodesStatusLock.Lock()
@@ -310,4 +320,56 @@ func restoreShards(reconstructedShards []*model.ShardToLoad) {
 			a.Save <- s
 		}(nodeToSave, restoreShards)
 	}
+}
+
+/**
+Controller for file deletion request.
+*/
+func deleteController(ctx echo.Context) error {
+	clowdee := ctx.Get("clowdee").(*model.Clowdee)
+
+	// bind deletion list from the request body
+	files := make([]*fileToDelete, 0)
+	if err := ctx.Bind(&files); err != nil {
+		logger.File().Infof("Error binding client's delete list, %s", err)
+		return err
+	}
+
+	// make file name list
+	nameList := make([]string, 0)
+	for _, file := range files {
+		nameList = append(nameList, file.Name)
+	}
+
+	delQ := operationq.NewDelQ()
+
+	// add deletion list to delete queue
+	if err := delQ.Push(clowdee.GoogleID, nameList...); err != nil {
+		if err != operationq.ErrFileNotExist {
+			return ctx.NoContent(http.StatusInternalServerError)
+		}
+	}
+
+	// schedule every shards for deletion to the each active nodes
+	// and get quotas for each nodes
+	quotas := delQ.Schedule()
+
+	// delete quotas concurrently
+	for machineID, shards := range quotas {
+		// if the machine is active
+		if activeNode := spool.Pool().FindActiveNode(machineID); activeNode != nil {
+			// delete shards on the node concurrently
+			go func(a *spool.ActiveNode, s []*model.ShardToDelete) {
+				a.Delete <- s
+			}(activeNode, shards)
+		} else { // if the machine is not active (cannot delete currently)
+			// record to database for later deletion
+			for _, shard := range shards {
+				database.Conn().
+					Create(&model.DeletedShard{Name: shard.Name, MachineID: machineID})
+			}
+		}
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
 }

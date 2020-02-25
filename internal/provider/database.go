@@ -19,6 +19,7 @@ func DBService() *gorm.DB {
 	model.MigrateNode()
 	model.MigrateFile()
 	model.MigrateShard()
+	model.MigrateDeletedShard()
 
 	return conn
 }

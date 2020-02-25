@@ -1,4 +1,4 @@
-package loadq
+package operationq
 
 import (
 	"errors"
@@ -25,12 +25,12 @@ func NewDQ() *DownloadQueue {
 Push the list of file to load by querying database.
 */
 func (dq *DownloadQueue) Push(googleID string, fileName string) error {
-	fileModels := &[]*model.File{}
+	fileModels := make([]*model.File, 0)
 
 	// find all segments of the file using google id and name
 	sqlResult := database.Conn().
 		Where(&model.File{GoogleID: googleID, Name: fileName}).
-		Find(fileModels)
+		Find(&fileModels)
 
 	if sqlResult.Error != nil {
 		// if the file is not exist in the record
@@ -44,7 +44,7 @@ func (dq *DownloadQueue) Push(googleID string, fileName string) error {
 	}
 
 	// for every file records(segments)
-	for _, fileModel := range *fileModels {
+	for _, fileModel := range fileModels {
 		fileToLoad := &model.FileToLoad{Model: fileModel}
 
 		// find all shards of the segment which are ordered by its position
