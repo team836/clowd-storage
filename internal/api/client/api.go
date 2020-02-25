@@ -286,6 +286,11 @@ func downloadController(ctx echo.Context) error {
 Restore(re-upload) the reconstruct shards to the another nodes.
 */
 func restoreShards(reconstructedShards []*model.ShardToLoad) {
+	// there are not exists shards to restore
+	if len(reconstructedShards) == 0 {
+		return
+	}
+
 	rq := operationq.NewRQ()
 	rq.Push(reconstructedShards...)
 
