@@ -91,6 +91,9 @@ type ActiveNode struct {
 	// delete shards on the node
 	Delete chan []*model.ShardToDelete
 
+	// flush the deleted shard list to the node
+	Flush chan bool
+
 	// websocket connection
 	conn *websocket.Conn
 }
@@ -106,6 +109,7 @@ func NewActiveNode(conn *websocket.Conn, nodeModel *model.Node) *ActiveNode {
 		Save:   make(chan []*model.ShardToSave),
 		Load:   make(chan *LoadChan),
 		Delete: make(chan []*model.ShardToDelete),
+		Flush:  make(chan bool),
 		conn:   conn,
 	}
 
@@ -217,6 +221,37 @@ func (node *ActiveNode) Run() {
 
 				logger.File().Errorf("Error sending deletion list to node, %s", err)
 				return
+			}
+		case <-node.Flush:
+			_ = node.conn.SetWriteDeadline(time.Now().Add(msgSendWait))
+
+			flushList := make([]*model.DeletedShard, 0)
+
+			// get flush list from the database
+			database.Conn().
+				Where("machine_id = ?", node.Model.MachineID).
+				Find(&flushList)
+
+			// if flush list is not empty
+			if len(flushList) != 0 {
+				// make deletion list
+				shards := make([]*model.ShardToDelete, 0)
+				for _, delShard := range flushList {
+					shards = append(shards, &model.ShardToDelete{Name: delShard.Name})
+				}
+
+				// send the deletion list to the node
+				if err := node.conn.WriteJSON(DataMsg{Type: deleteType, Contents: shards}); err != nil {
+					logger.File().Errorf("Error flushing deletion list to node, %s", err)
+					return
+				}
+
+				// at this point, deletion is success
+				// so delete records of deletion list
+				for _, flushedShard := range flushList {
+					database.Conn().
+						Delete(flushedShard)
+				}
 			}
 		}
 	}

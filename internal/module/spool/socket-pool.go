@@ -152,6 +152,11 @@ func (pool *SocketPool) run() {
 		select {
 		case node := <-pool.Register:
 			pool.Nodes[node] = true
+
+			// flush deleted shard list
+			go func() {
+				node.Flush <- true
+			}()
 		case node := <-pool.Unregister:
 			_ = node.conn.Close()
 			delete(pool.Nodes, node)
